@@ -48,8 +48,8 @@ django-imdb-search/
 ## Setup Instructions
 1. **Clone the Repository**:
    ```bash
-   git clone https://github.com/your-username/django-imdb-search.git
-   cd django-imdb-search
+   git clone https://github.com/ftkbyond77/semantic-search-IMDBm.git
+   cd search1
    ```
 
 2. **Set Up Kaggle Credentials**:
@@ -206,7 +206,7 @@ django-imdb-search/
 - Use a production-ready database like PostgreSQL.
 
 ## License
-MIT License - feel free to use and modify this project.
+Apache License.
 
 ## Contact
 For issues or suggestions, open a GitHub issue or contact the project maintainer.
