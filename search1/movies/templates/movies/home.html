@@ -1,62 +1,274 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>IMDB Top 1000</title>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>IMDB Top 1000 Movies & Shows</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet" />
     <style>
-        body { font-family: Arial, sans-serif; margin: 20px; }
-        table { width: 100%; border-collapse: collapse; }
-        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-        th { background-color: #f2f2f2; }
-        tr:nth-child(even) { background-color: #f9f9f9f9; }
-        .search-form { margin-bottom: 20px; }
-        .search-form input[type="text"] { padding: 8px; width: 300px; }
-        .search-form button { padding: 8px 16px; }
-        .switch-btn { padding: 8px 16px; margin-left: 10px; background-color: #4CAF50; color: white; border: none; cursor: pointer; }
-        .switch-btn:hover { background-color: #45a049; }
+        :root {
+            --primary-color: #1a73e8;
+            --keyword-bg: #4CAF50;
+            --semantic-bg: #e91e63;
+            --hover-offset: 5px;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Roboto', Arial, sans-serif;
+            line-height: 1.6;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 2.5rem;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.1);
+        }
+
+        .search-form {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 30px;
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            align-items: center;
+        }
+
+        .search-form input[type="text"] {
+            flex: 1;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 1rem;
+            transition: border-color 0.3s;
+        }
+
+        .search-form input[type="text"]:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 5px rgba(26, 115, 232, 0.3);
+        }
+
+        .search-form button[type="submit"] {
+            padding: 12px;
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1.2rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 48px;
+            transition: background 0.3s, transform 0.2s;
+        }
+
+        .search-form button[type="submit"]:hover {
+            background: #1557b0;
+            transform: translateY(-2px);
+        }
+
+        .search-form button[type="submit"]::before {
+            content: '\1F50D'; /* Unicode for magnifying glass */
+            font-size: 1.2rem;
+        }
+
+        .switch-btn {
+            padding: 12px 24px;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: background 0.3s, transform 0.2s;
+            background: var(--keyword-bg);
+        }
+
+        .switch-btn.semantic {
+            background: var(--semantic-bg);
+        }
+
+        .switch-btn:hover {
+            filter: brightness(90%);
+            transform: translateY(-2px);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        th,
+        td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+
+        th {
+            background: #f8f9fa;
+            color: #333;
+            font-weight: 700;
+            text-transform: uppercase;
+            font-size: 0.9rem;
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        tr:hover {
+            background: #f0f4ff;
+            transition: background 0.2s;
+        }
+
+        td {
+            font-size: 0.95rem;
+            color: #444;
+        }
+
+        .no-results {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+            font-style: italic;
+        }
+
+        .similarity-box {
+            display: inline-block;
+            padding: 4px 8px;
+            background: #e91e63;
+            color: white;
+            font-weight: 700;
+            border-radius: 12px;
+            font-size: 0.85rem;
+            text-align: center;
+            min-width: 60px;
+        }
+
+        @media (max-width: 768px) {
+            .search-form {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .search-form input[type="text"] {
+                width: 100%;
+            }
+
+            .search-form button,
+            .switch-btn {
+                width: 100%;
+            }
+
+            table {
+                font-size: 0.9rem;
+            }
+
+            th,
+            td {
+                padding: 8px;
+            }
+        }
     </style>
 </head>
 <body>
-    <h1>IMDB Movies and TV Shows</h1>
-    <form class="search_form" method="GET" action="">
-        <input type="text" name="q" value="{{ query }}" placeholder="Search by title, genre, director, or star...">
-        <input type="hidden" name="search_type" value="{{ search_type }}">
-        <button type="submit">Search</button>
-        <button type="button" class="switch-btn" onclick="toggleSearchType()">
-            Switch to to {% if search_type == 'keyword' %}Semantic{% else %}Keyword{% endif %} Search
-        </button>
-    </form>
-    <table>
-        <thead>
-            <tr>
-                <th>Title</th>
-                <th>Year</th>
-                <th>Runtime</th>
-                <th>Genre</th>
-                <th>Rating</th>
-                <th>Director</th>
-                <th>Stars</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for movie in movies %}
+    <div class="container">
+        <h1>IMDB Top 1000 Movies & Shows</h1>
+        <form class="search-form" method="GET" action="">
+            <input
+                type="text"
+                name="q"
+                value="{{ query }}"
+                placeholder="Search by title, genre, director, star, or theme..."
+            />
+            <input type="hidden" name="search_type" value="{{ search_type }}" />
+            <button type="submit" title="Search"></button>
+            <button
+                type="button"
+                class="switch-btn {% if search_type == 'semantic' %}semantic{% endif %}"
+                onclick="toggleSearchType()"
+            >
+                {% if search_type == 'keyword' %}Semantic Search{% else %}Keyword Search{% endif %}
+            </button>
+        </form>
+
+        <table>
+            <thead>
                 <tr>
-                    <td>{{ movie.series_title }}</td>
-                    <td>{{ movie.released_year|default:"N/A" }}</td>
-                    <td>{{ movie.runtime }}</td>
-                    <td>{{ movie.genre }}</td>
-                    <td>{{ movie.rating }}</td>
-                    <td>{{ movie.director }}</td>
-                    <td>{{ movie.star1 }}, {{ movie.star2 }}</td>
+                    <th>Title</th>
+                    <th>Year</th>
+                    <th>Runtime</th>
+                    <th>Genre</th>
+                    <th>Rating</th>
+                    <th>Director</th>
+                    <th>Stars</th>
+                    {% if show_similarity %}
+                        <th>Similarity</th>
+                    {% endif %}
                 </tr>
-            {% empty %}
-                <tr>
-                    <td colspan="7">No movies found. Please load the dataset or try a different search.</td>
-                </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+            </thead>
+            <tbody>
+                {% if show_similarity %}
+                    {% for entry in movies %}
+                        <tr>
+                            <td>{{ entry.movie.series_title }}</td>
+                            <td>{{ entry.movie.released_year|default:"N/A" }}</td>
+                            <td>{{ entry.movie.runtime }}</td>
+                            <td>{{ entry.movie.genre }}</td>
+                            <td>{{ entry.movie.rating }}</td>
+                            <td>{{ entry.movie.director }}</td>
+                            <td>{{ entry.movie.star1 }}, {{ entry.movie.star2 }}</td>
+                            <td><span class="similarity-box">{{ entry.similarity }}%</span></td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="8" class="no-results">No movies found.</td>
+                        </tr>
+                    {% endfor %}
+                {% else %}
+                    {% for movie in movies %}
+                        <tr>
+                            <td>{{ movie.series_title }}</td>
+                            <td>{{ movie.released_year|default:"N/A" }}</td>
+                            <td>{{ movie.runtime }}</td>
+                            <td>{{ movie.genre }}</td>
+                            <td>{{ movie.rating }}</td>
+                            <td>{{ movie.director }}</td>
+                            <td>{{ movie.star1 }}, {{ movie.star2 }}</td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="7" class="no-results">No movies found.</td>
+                        </tr>
+                    {% endfor %}
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
     <script>
         function toggleSearchType() {
             const searchTypeInput = document.querySelector('input[name="search_type"]');
