@@ -5,6 +5,8 @@ from sentence_transformers import SentenceTransformer, util
 import numpy as np
 import torch
 
+model = SentenceTransformer('all-MiniLM-L6-v2')
+
 def home(request):
     search_type = request.GET.get('search_type', 'keyword')
     query = request.GET.get('q', '').strip()
@@ -21,51 +23,38 @@ def home(request):
             )
         elif search_type == 'semantic':
             try:
-                # Load model for semantic search
-                model = SentenceTransformer('all-MiniLM-L6-v2')
-                query_embedding = model.encode(query, convert_to_tensor=True)
-                
-                # Get all movies with embeddings
+                # Encode query embedding as float32 tensor
+                query_embedding = model.encode(query)
+                query_embedding = torch.tensor(query_embedding, dtype=torch.float32)
+
                 all_movies = movies.exclude(embedding__isnull=True)
-                
                 if all_movies.exists():
-                    # Compute cosine similarity for each movie
                     similarities = []
                     for movie in all_movies:
                         try:
-                            # Convert movie embedding to tensor with consistent dtype
-                            if isinstance(movie.embedding, (list, np.ndarray)):
-                                movie_embedding = torch.tensor(movie.embedding, dtype=query_embedding.dtype)
-                            else:
-                                movie_embedding = torch.tensor(movie.embedding, dtype=query_embedding.dtype)
-                            
-                            # Ensure both tensors have the same device
-                            movie_embedding = movie_embedding.to(query_embedding.device)
-                            
-                            # Compute similarity
+                            # Convert movie embedding to float32 tensor
+                            movie_embedding = np.array(movie.embedding, dtype=np.float32)
+                            movie_embedding = torch.tensor(movie_embedding, dtype=torch.float32)
+
+                            # Compute cosine similarity
                             similarity = util.cos_sim(query_embedding, movie_embedding).item()
                             similarities.append((movie, similarity))
-                            
                         except Exception as e:
-                            # Skip movies with problematic embeddings
-                            print(f"Skipping movie {movie.id} due to embedding error: {e}")
+                            print(f"Error processing movie {movie.id}: {e}")
                             continue
-                    
+
                     if similarities:
-                        # Sort by similarity (descending)
                         similarities.sort(key=lambda x: x[1], reverse=True)
-                        # Get top results (e.g., top 50)
                         top_movies = [movie for movie, _ in similarities[:50]]
                         movies = all_movies.filter(id__in=[m.id for m in top_movies])
                     else:
-                        # No valid similarities found, return empty queryset
                         movies = Movie.objects.none()
-                        
+                else:
+                    movies = Movie.objects.none()
             except Exception as e:
-                # If semantic search fails, fall back to empty results
                 print(f"Semantic search error: {e}")
                 movies = Movie.objects.none()
-    
+
     return render(request, 'movies/home.html', {
         'movies': movies,
         'query': query,

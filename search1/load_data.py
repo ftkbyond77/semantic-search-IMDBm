@@ -1,37 +1,33 @@
 import os
 import sys
-from django.core import management
-from django.conf import settings
+import django
 from import_dataset import download_imdb_dataset
 import pandas as pd
 from sentence_transformers import SentenceTransformer
 import numpy as np
 
-# Configure Django settings manually if not set
-if not settings.configured:
-    os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'imdb_project.settings')
-    try:
-        from django import setup
-        setup()
-    except ImportError as e:
-        print(f"Error importing Django: {e}")
-        sys.exit(1)
+# Configure Django settings
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'imdb_project.settings')
+django.setup()
 
 from movies.models import Movie
 
-def load_imdb_data():
+def load_imdb_data(clear_existing=False):
     try:
-        # Load pre-trained model for embeddings
+        # Load pre-trained model
         model = SentenceTransformer('all-MiniLM-L6-v2')
-        # Download dataset and get CSV path
+        # Download dataset
         csv_file = download_imdb_dataset()
         df = pd.read_csv(csv_file)
-        # Clear existing data (optional, remove if you want to append)
-        Movie.objects.all().delete()
-        # Compute embeddings for overviews
-        overviews = df['Overview'].tolist()
-        embeddings = model.encode(overviews, show_progress_bar=True)
+        # Clear existing data if specified
+        if clear_existing:
+            Movie.objects.all().delete()
+            print("Cleared existing data.")
+        # Track existing titles
+        existing_titles = set(Movie.objects.values_list('series_title', flat=True))
         for i, row in df.iterrows():
+            if row['Series_Title'] in existing_titles:
+                continue
             try:
                 released_year = None
                 try:
@@ -39,6 +35,8 @@ def load_imdb_data():
                 except (ValueError, TypeError):
                     print(f"Warning: Invalid 'Released_Year' value '{row['Released_Year']}' for '{row['Series_Title']}', skipping.")
                     continue
+                # Compute embedding as float32
+                embedding = model.encode(row['Overview'], convert_to_numpy=True, dtype=np.float32).tolist()
                 Movie.objects.create(
                     series_title=row['Series_Title'],
                     released_year=released_year,
@@ -49,7 +47,7 @@ def load_imdb_data():
                     director=row['Director'],
                     star1=row['Star1'],
                     star2=row['Star2'],
-                    embedding=embeddings[i].tolist()  # Store embedding as JSON
+                    embedding=embedding
                 )
             except Exception as e:
                 print(f"Error processing row for '{row.get('Series_Title', 'Unknown')}': {e}")
@@ -59,4 +57,4 @@ def load_imdb_data():
         print(f"Error loading data: {e}")
 
 if __name__ == "__main__":
-    load_imdb_data()
+    load_imdb_data(clear_existing=True)

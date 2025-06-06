@@ -3,28 +3,28 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>IMDB Top 1000 Movies</title>
+    <title>IMDB Top 1000</title>
     <style>
         body { font-family: Arial, sans-serif; margin: 20px; }
         table { width: 100%; border-collapse: collapse; }
         th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
         th { background-color: #f2f2f2; }
-        tr:nth-child(even) { background-color: #f9f9f9; }
+        tr:nth-child(even) { background-color: #f9f9f9f9; }
         .search-form { margin-bottom: 20px; }
-        .search-form input { padding: 8px; width: 300px; }
+        .search-form input[type="text"] { padding: 8px; width: 300px; }
         .search-form button { padding: 8px 16px; }
         .switch-btn { padding: 8px 16px; margin-left: 10px; background-color: #4CAF50; color: white; border: none; cursor: pointer; }
         .switch-btn:hover { background-color: #45a049; }
     </style>
 </head>
 <body>
-    <h1>IMDB Top 1000 Movies and TV Shows</h1>
-    <form class="search-form" method="GET" action="">
+    <h1>IMDB Movies and TV Shows</h1>
+    <form class="search_form" method="GET" action="">
         <input type="text" name="q" value="{{ query }}" placeholder="Search by title, genre, director, or star...">
         <input type="hidden" name="search_type" value="{{ search_type }}">
         <button type="submit">Search</button>
         <button type="button" class="switch-btn" onclick="toggleSearchType()">
-            Switch to {% if search_type == 'keyword' %}Semantic{% else %}Keyword{% endif %} Search
+            Switch to to {% if search_type == 'keyword' %}Semantic{% else %}Keyword{% endif %} Search
         </button>
     </form>
     <table>
