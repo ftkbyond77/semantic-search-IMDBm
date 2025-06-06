@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IMDB Top 1000 Movies</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: cultuur; }
+        tr:nth-child(even) { background-color: #f9f9f9; }
+    </style>
+</head>
+<body>
+    <h1>IMDB Top 1000 Movies and TV Shows</h1>
+    <table>
+        <thead>
+            <tr>
+                <th>Title</th>
+                <th>Year</th>
+                <th>Runtime</th>
+                <th>Genre</th>
+                <th>Rating</th>
+                <th>Director</th>
+                <th>Stars</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for movie in movies %}
+                <tr>
+                    <td>{{ movie.series_title }}</td>
+                    <td>{{ movie.released_year }}</td>
+                    <td>{{ movie.runtime }}</td>
+                    <td>{{ movie.genre }}</td>
+                    <td>{{ movie.rating }}</td>
+                    <td>{{ movie.director }}</td>
+                    <td>{{ movie.star1 }}, {{ movie.star2 }}</td>
+                </tr>
+            {% empty %}
+                <tr>
+                    <td colspan="7">No movies found. Please load the dataset.</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</body>
+</html>
