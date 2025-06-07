@@ -48,8 +48,8 @@ django-imdb-search/
 ## Setup Instructions
 1. **Clone the Repository**:
    ```bash
-   git clone https://github.com/your-username/django-imdb-search.git
-   cd django-imdb-search
+   git clone https://github.com/ftkbyond77/semantic-search-IMDBm.git
+   cd search1
    ```
 
 2. **Set Up Kaggle Credentials**:
@@ -77,32 +77,26 @@ django-imdb-search/
    - Create `docker-compose.yml` in the project root:
      ```yaml
      version: '3.8'
-     services:
-       web:
-         build: .
-         ports:
-           - "8000:8000"
-         volumes:
-           - .:/app
-         environment:
-           - KAGGLE_USERNAME=${KAGGLE_USERNAME}
-           - KAGGLE_KEY=${KAGGLE_KEY}
-         depends_on:
-           - db
-       db:
-         image: sqlite3
-         volumes:
-           - ./db.sqlite3:/app/db.sqlite3
+
+      services:
+        web:
+          build: .
+          ports:
+            - "8000:8000"
+          environment:
+            - PYTHONUNBUFFERED=1
      ```
 
 5. **Install Dependencies**:
    - Create `requirements.txt` in the project root:
      ```
      django==5.1.1
-     kagglehub==0.3.12
+     kgglehub==0.3.1
      pandas==2.2.2
-     sentence-transformers==3.1.1
      numpy==1.26.4
+     torch==2.3.0  
+     transformers==4.40.0
+     sentence-transformers==3.0.0
      ```
 
 6. **Build and Run Docker**:
@@ -206,7 +200,7 @@ django-imdb-search/
 - Use a production-ready database like PostgreSQL.
 
 ## License
-MIT License - feel free to use and modify this project.
+Apache License.
 
 ## Contact
 For issues or suggestions, open a GitHub issue or contact the project maintainer.
