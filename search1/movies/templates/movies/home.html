@@ -92,7 +92,7 @@
         }
 
         .search-form button[type="submit"]::before {
-            content: '\1F50D'; /* Unicode for magnifying glass */
+            content: '\1F50D';
             font-size: 1.2rem;
         }
 
@@ -174,6 +174,81 @@
             min-width: 60px;
         }
 
+        /* Popup Styles */
+        .popup {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+            max-width: 500px;
+            width: 90%;
+            z-index: 1000;
+            display: none;
+        }
+
+        .popup.active {
+            display: block;
+        }
+
+        .popup h3 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 1.5rem;
+            text-align: center;
+        }
+
+        .popup table {
+            width: 100%;
+        }
+
+        .popup .close-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: #e91e63;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 5px 10px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: background 0.3s;
+        }
+
+        .popup .close-btn:hover {
+            background: #c2185b;
+        }
+
+        .overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 999;
+            display: none;
+        }
+
+        .overlay.active {
+            display: block;
+        }
+
+        a {
+            color: var(--primary-color);
+            text-decoration: none;
+            transition: color 0.3s;
+        }
+
+        a:hover {
+            color: #1557b0;
+            text-decoration: underline;
+        }
+
         @media (max-width: 768px) {
             .search-form {
                 flex-direction: column;
@@ -197,13 +272,18 @@
             td {
                 padding: 8px;
             }
+
+            .popup {
+                width: 95%;
+                padding: 15px;
+            }
         }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>IMDB Top 1000 Movies & Shows</h1>
-        <form class="search-form" method="GET" action="">
+        <form class="search-form" method="GET" action="{% url 'movies:home' %}">
             <input
                 type="text"
                 name="q"
@@ -238,7 +318,7 @@
                 <tbody>
                     {% for movie in recommendations %}
                         <tr>
-                            <td>{{ movie.series_title }}</td>
+                            <td><a href="{% url 'movies:movie_detail' movie_id=movie.id %}">{{ movie.series_title }}</a></td>
                             <td>{{ movie.released_year|default:"N/A" }}</td>
                             <td>{{ movie.runtime }}</td>
                             <td>{{ movie.genre }}</td>
@@ -274,7 +354,7 @@
                 {% if show_similarity %}
                     {% for entry in movies %}
                         <tr>
-                            <td>{{ entry.movie.series_title }}</td>
+                            <td><a href="{% url 'movies:movie_detail' movie_id=entry.movie.id %}">{{ entry.movie.series_title }}</a></td>
                             <td>{{ entry.movie.released_year|default:"N/A" }}</td>
                             <td>{{ entry.movie.runtime }}</td>
                             <td>{{ entry.movie.genre }}</td>
@@ -291,7 +371,7 @@
                 {% else %}
                     {% for movie in movies %}
                         <tr>
-                            <td>{{ movie.series_title }}</td>
+                            <td><a href="{% url 'movies:movie_detail' movie_id=movie.id %}">{{ movie.series_title }}</a></td>
                             <td>{{ movie.released_year|default:"N/A" }}</td>
                             <td>{{ movie.runtime }}</td>
                             <td>{{ movie.genre }}</td>
@@ -308,11 +388,60 @@
             </tbody>
         </table>
     </div>
+
+    {% if user_authenticated and search_suggestions %}
+        <div class="overlay" id="popupOverlay"></div>
+        <div class="popup" id="searchPopup">
+            <button class="close-btn" onclick="closePopup()">X</button>
+            <h3>Based on Your Searches</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Title</th>
+                        <th>Genre</th>
+                        <th>Rating</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for movie in search_suggestions %}
+                        <tr>
+                            <td><a href="{% url 'movies:movie_detail' movie_id=movie.id %}">{{ movie.series_title }}</a></td>
+                            <td>{{ movie.genre }}</td>
+                            <td>{{ movie.rating }}</td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="3" class="no-results">No suggestions based on searches.</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% endif %}
+
     <script>
         function toggleSearchType() {
             const searchTypeInput = document.querySelector('input[name="search_type"]');
             searchTypeInput.value = searchTypeInput.value === 'keyword' ? 'semantic' : 'keyword';
             document.querySelector('form').submit();
+        }
+
+        window.onload = function() {
+            const popup = document.getElementById('searchPopup');
+            const overlay = document.getElementById('popupOverlay');
+            if (popup && overlay) {
+                popup.classList.add('active');
+                overlay.classList.add('active');
+            }
+        };
+
+        function closePopup() {
+            const popup = document.getElementById('searchPopup');
+            const overlay = document.getElementById('popupOverlay');
+            if (popup && overlay) {
+                popup.classList.remove('active');
+                overlay.classList.remove('active');
+            }
         }
     </script>
 </body>

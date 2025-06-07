@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{{ movie.series_title }} - IMDB Details</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet" />
+    <style>
+        :root {
+            --primary-color: #1a73e8;
+            --keyword-bg: #4CAF50;
+            --semantic-bg: #e91e63;
+            --hover-offset: 5px;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Roboto', Arial, sans-serif;
+            line-height: 1.6;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 2rem;
+            text-align: center;
+        }
+
+        .movie-details {
+            margin-bottom: 30px;
+        }
+
+        .movie-details p {
+            margin: 10px 0;
+            font-size: 1rem;
+            color: #444;
+        }
+
+        .movie-details strong {
+            color: #333;
+            display: inline-block;
+            width: 120px;
+        }
+
+        .ratings-section {
+            margin-top: 30px;
+        }
+
+        h2 {
+            color: #333;
+            font-size: 1.5rem;
+            margin-bottom: 15px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            background: #f8f9fa;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        th, td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+
+        th {
+            background: #e0e0e0;
+            color: #333;
+            font-weight: 700;
+            text-transform: uppercase;
+            font-size: 0.9rem;
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        .no-results {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+            font-style: italic;
+        }
+
+        .back-link {
+            display: inline-block;
+            margin-top: 20px;
+            padding: 10px 20px;
+            background: var(--primary-color);
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+            transition: background 0.3s, transform 0.2s;
+        }
+
+        .back-link:hover {
+            background: #1557b0;
+            transform: translateY(-2px);
+        }
+
+        a {
+            color: var(--primary-color);
+            text-decoration: none;
+            transition: color 0.3s;
+        }
+
+        a:hover {
+            color: #1557b0;
+            text-decoration: underline;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 15px;
+                width: 95%;
+            }
+
+            h1 {
+                font-size: 1.5rem;
+            }
+
+            .movie-details p {
+                font-size: 0.95rem;
+            }
+
+            .movie-details strong {
+                width: 100px;
+            }
+
+            table {
+                font-size: 0.9rem;
+            }
+
+            th, td {
+                padding: 8px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>{{ movie.series_title }}</h1>
+        <div class="movie-details">
+            <p><strong>Year:</strong> {{ movie.released_year|default:"N/A" }}</p>
+            <p><strong>Runtime:</strong> {{ movie.runtime }}</p>
+            <p><strong>Genre:</strong> {{ movie.genre }}</p>
+            <p><strong>IMDB Rating:</strong> {{ movie.rating }}</p>
+            <p><strong>Director:</strong> {{ movie.director }}</p>
+            <p><strong>Stars:</strong> {{ movie.star1 }}, {{ movie.star2 }}</p>
+            <p><strong>Overview:</strong> {{ movie.overview }}</p>
+            {% if user_authenticated and user_rating %}
+                <p><strong>Your Rating:</strong> {{ user_rating.rating }} stars</p>
+            {% elif user_authenticated %}
+                <p><strong>Your Rating:</strong> Not rated yet</p>
+            {% endif %}
+        </div>
+
+        <div class="ratings-section">
+            <h2>User Ratings</h2>
+            {% if ratings %}
+                <table>
+                    <thead>
+                        <tr>
+                            <th>User</th>
+                            <th>Rating</th>
+                            <th>Date</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for rating in ratings %}
+                            <tr>
+                                <td>{{ rating.user.username }}</td>
+                                <td>{{ rating.rating }} stars</td>
+                                <td>{{ rating.timestamp|date:"F d, Y" }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p class="no-results">No user ratings for this movie yet.</p>
+            {% endif %}
+        </div>
+
+        <a href="{% url 'movies:home' %}" class="back-link">Back to Home</a>
+    </div>
+</body>
+</html>

@@ -1,9 +1,7 @@
-# imdb_project/urls.py
 from django.contrib import admin
-from django.urls import path
-from movies.views import home
+from django.urls import path, include
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('', home, name='home'),  # Root URL for home page
+    path('', include('movies.urls', namespace='movies')),
 ]

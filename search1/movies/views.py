@@ -1,6 +1,6 @@
-from django.shortcuts import render
-from .models import Movie, Rating
-from django.db.models import Q
+from django.shortcuts import render, get_object_or_404
+from .models import Movie, Rating, SearchHistory
+from django.db.models import Q, Count
 from sentence_transformers import SentenceTransformer, util
 import numpy as np
 import torch
@@ -17,7 +17,6 @@ def matrix_factorization(ratings_matrix, user_ids, movie_ids, k=5):
     print(f"Ratings matrix shape: {ratings_matrix.shape}")
     print(f"Ratings matrix non-zero entries: {np.count_nonzero(ratings_matrix)}")
     try:
-        # Adjust k to be smaller than the matrix dimensions
         k = min(k, ratings_matrix.shape[0] - 1, ratings_matrix.shape[1] - 1)
         if k < 1:
             print("Matrix too small for SVD, returning empty predictions")
@@ -55,14 +54,51 @@ def get_recommendations(user_id, ratings_matrix, user_ids, movie_ids, movies_que
     print(f"Top {num_recommendations} recommendations: {[m.series_title for m in recommendations]}")
     return recommendations
 
+def get_search_based_suggestions(user_id, movies_queryset, num_suggestions=5):
+    frequent_searches = SearchHistory.objects.filter(user_id=user_id).values('query').annotate(
+        count=Count('query')).order_by('-count')[:3]
+    print(f"Frequent searches for user {user_id}: {[s['query'] for s in frequent_searches]}")
+    
+    suggestions = []
+    for search in frequent_searches:
+        query = search['query']
+        matches = movies_queryset.filter(
+            Q(series_title__icontains=query) |
+            Q(genre__icontains=query) |
+            Q(director__icontains=query) |
+            Q(star1__icontains=query) |
+            Q(star2__icontains=query)
+        ).exclude(
+            id__in=Rating.objects.filter(user_id=user_id).values('movie_id')
+        )[:num_suggestions]
+        suggestions.extend(matches)
+    
+    seen = set()
+    unique_suggestions = []
+    for movie in suggestions:
+        if movie.id not in seen:
+            unique_suggestions.append(movie)
+            seen.add(movie.id)
+    unique_suggestions = unique_suggestions[:num_suggestions]
+    print(f"Search-based suggestions: {[m.series_title for m in unique_suggestions]}")
+    return unique_suggestions
+
 def home(request):
     search_type = request.GET.get('search_type', 'keyword')
     query = request.GET.get('q', '').strip()
     all_movies = Movie.objects.all()
     show_similarity = False
     recommendations = []
+    search_suggestions = []
     
     if request.user.is_authenticated:
+        if query:
+            SearchHistory.objects.create(
+                user=request.user,
+                query=query,
+                search_type=search_type
+            )
+        
         users = list(set(Rating.objects.values_list('user_id', flat=True)))
         movies = list(set(Rating.objects.values_list('movie_id', flat=True)))
         print(f"Users found: {len(users)}")
@@ -84,8 +120,12 @@ def home(request):
                 movies_queryset=all_movies,
                 num_recommendations=10
             )
-        else:
-            print("No users or rated movies found for recommendations")
+        
+        search_suggestions = get_search_based_suggestions(
+            user_id=request.user.id,
+            movies_queryset=all_movies,
+            num_suggestions=5
+        )
 
     if query:
         if search_type == 'keyword':
@@ -130,11 +170,26 @@ def home(request):
         movies = all_movies
 
     print(f"Recommendations to template: {[m.series_title for m in recommendations]}")
+    print(f"Search suggestions to template: {[m.series_title for m in search_suggestions]}")
     return render(request, 'movies/home.html', {
         'movies': movies,
         'query': query,
         'search_type': search_type,
         'show_similarity': show_similarity,
         'user_authenticated': request.user.is_authenticated,
-        'recommendations': recommendations
+        'recommendations': recommendations,
+        'search_suggestions': search_suggestions
+    })
+
+def movie_detail(request, movie_id):
+    movie = get_object_or_404(Movie, id=movie_id)
+    ratings = Rating.objects.filter(movie=movie).select_related('user')
+    user_rating = None
+    if request.user.is_authenticated:
+        user_rating = Rating.objects.filter(movie=movie, user=request.user).first()
+    return render(request, 'movies/detail.html', {
+        'movie': movie,
+        'ratings': ratings,
+        'user_rating': user_rating,
+        'user_authenticated': request.user.is_authenticated,
     })

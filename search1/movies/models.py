@@ -19,7 +19,7 @@ class Movie(models.Model):
 class Rating(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     movie = models.ForeignKey(Movie, on_delete=models.CASCADE, related_name='user_ratings')
-    rating = models.IntegerField(choices=[(i, i) for i in range(1, 6)])  # 1-5 stars
+    rating = models.IntegerField(choices=[(i, i) for i in range(1, 6)])
     timestamp = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -27,3 +27,12 @@ class Rating(models.Model):
 
     def __str__(self):
         return f"{self.user.username} rated {self.movie.series_title} {self.rating} stars"
+
+class SearchHistory(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    query = models.CharField(max_length=255)
+    search_type = models.CharField(max_length=20, choices=[('keyword', 'Keyword'), ('semantic', 'Semantic')])
+    timestamp = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.user.username} searched '{self.query}' ({self.search_type})"
