@@ -7,3 +7,15 @@ services:
       - "8000:8000"
     environment:
       - PYTHONUNBUFFERED=1
+      - DJANGO_SETTINGS_MODULE=imdb_project.settings
+      - DEBUG=True
+    volumes:
+      - .:/app
+      - static_data:/app/staticfiles
+    command: >
+      sh -c "python manage.py migrate &&
+             python manage.py collectstatic --noinput &&
+             python manage.py runserver 0.0.0.0:8000"
+
+volumes:
+  static_data:

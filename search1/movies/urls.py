@@ -1,7 +1,7 @@
 from django.urls import path
 from . import views
 
-app_name = 'movies'
 urlpatterns = [
-    path('', views.home, name='home'),  # Home page with search functionality
+    path('', views.home, name='home'),
+    path('rate/<int:movie_id>/', views.rate_movie, name='rate_movie'),
 ]

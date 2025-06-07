@@ -32,12 +32,17 @@
             margin: 0 auto;
         }
 
-        h1 {
+        h1, h2 {
             text-align: center;
             color: #333;
             margin-bottom: 20px;
             font-size: 2.5rem;
             text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.1);
+        }
+
+        h2 {
+            font-size: 1.8rem;
+            margin-top: 40px;
         }
 
         .search-form {
@@ -215,6 +220,40 @@
                 {% if search_type == 'keyword' %}Semantic Search{% else %}Keyword Search{% endif %}
             </button>
         </form>
+
+        {% if user_authenticated and recommendations %}
+            <h2>Recommended for You</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Title</th>
+                        <th>Year</th>
+                        <th>Runtime</th>
+                        <th>Genre</th>
+                        <th>Rating</th>
+                        <th>Director</th>
+                        <th>Stars</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for movie in recommendations %}
+                        <tr>
+                            <td>{{ movie.series_title }}</td>
+                            <td>{{ movie.released_year|default:"N/A" }}</td>
+                            <td>{{ movie.runtime }}</td>
+                            <td>{{ movie.genre }}</td>
+                            <td>{{ movie.rating }}</td>
+                            <td>{{ movie.director }}</td>
+                            <td>{{ movie.star1 }}, {{ movie.star2 }}</td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="7" class="no-results">No recommendations available.</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% endif %}
 
         <table>
             <thead>
