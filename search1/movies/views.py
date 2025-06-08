@@ -1,6 +1,10 @@
-from django.shortcuts import render, get_object_or_404
+from django.shortcuts import render, get_object_or_404, redirect
 from django.http import JsonResponse
 from django.contrib.admin.views.decorators import staff_member_required
+from django.contrib.auth.decorators import login_required
+from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth.models import User
+from django.contrib import messages
 from django.core import serializers
 from .models import Movie, Rating, SearchHistory
 from django.db.models import Q, Count
@@ -122,7 +126,95 @@ def get_search_based_suggestions(user_id, movies_queryset, num_suggestions=5):
     print(f"Search-based suggestions: {[m.series_title for m in unique_suggestions]}")
     return unique_suggestions
 
+def auth_view(request):
+    """Handle authentication page"""
+    # If user is already authenticated, redirect to home
+    if request.user.is_authenticated:
+        return redirect('movies:home')
+    
+    return render(request, 'movies/auth.html')
+
+def login_view(request):
+    """Handle user login"""
+    if request.method == 'POST':
+        username = request.POST.get('username')
+        password = request.POST.get('password')
+        
+        if username and password:
+            user = authenticate(request, username=username, password=password)
+            if user is not None:
+                login(request, user)
+                messages.success(request, f'Welcome back, {user.username}!')
+                return redirect('movies:home')
+            else:
+                messages.error(request, 'Invalid username or password.')
+        else:
+            messages.error(request, 'Please fill in all fields.')
+    
+    return render(request, 'movies/auth.html')
+
+def signup_view(request):
+    """Handle user registration"""
+    if request.method == 'POST':
+        username = request.POST.get('username')
+        email = request.POST.get('email')
+        password1 = request.POST.get('password1')
+        password2 = request.POST.get('password2')
+        
+        # Validation
+        if not all([username, email, password1, password2]):
+            messages.error(request, 'Please fill in all fields.')
+            return render(request, 'movies/auth.html')
+        
+        if password1 != password2:
+            messages.error(request, 'Passwords do not match.')
+            return render(request, 'movies/auth.html')
+        
+        if len(password1) < 8:
+            messages.error(request, 'Password must be at least 8 characters long.')
+            return render(request, 'movies/auth.html')
+        
+        if User.objects.filter(username=username).exists():
+            messages.error(request, 'Username already exists.')
+            return render(request, 'movies/auth.html')
+        
+        if User.objects.filter(email=email).exists():
+            messages.error(request, 'Email already registered.')
+            return render(request, 'movies/auth.html')
+        
+        try:
+            # Create user
+            user = User.objects.create_user(
+                username=username,
+                email=email,
+                password=password1
+            )
+            
+            # Log them in
+            login(request, user)
+            messages.success(request, f'Welcome to IMDB Movie Explorer, {user.username}!')
+            return redirect('movies:home')
+            
+        except Exception as e:
+            messages.error(request, 'An error occurred during registration. Please try again.')
+            print(f"Registration error: {e}")
+    
+    return render(request, 'movies/auth.html')
+
+def logout_view(request):
+    """Handle user logout"""
+    logout(request)
+    messages.success(request, 'You have been logged out successfully.')
+    return redirect('movies:auth')
+
 def home(request):
+    # Check if user is trying to access as guest
+    is_guest = request.GET.get('guest') == 'true'
+    
+    # If not authenticated and not guest, redirect to auth
+    if not request.user.is_authenticated and not is_guest:
+        return redirect('movies:auth')
+    
     search_type = request.GET.get('search_type', 'keyword')
     query = request.GET.get('q', '').strip()
     all_movies = Movie.objects.all()
@@ -183,7 +275,7 @@ def home(request):
         movies = all_movies
         results_count = movies.count()
 
-    # Handle recommendations for authenticated users
+    # Handle recommendations for authenticated users only
     if request.user.is_authenticated:
         users = list(set(Rating.objects.values_list('user_id', flat=True)))
         movies_with_ratings = list(set(Rating.objects.values_list('movie_id', flat=True)))
@@ -225,7 +317,9 @@ def home(request):
         'search_suggestions': search_suggestions,
         'results_count': results_count,
         'is_staff': request.user.is_staff if request.user.is_authenticated else False,
+        'is_guest': is_guest,
     })
+
 
 def movie_detail(request, movie_id):
     movie = get_object_or_404(Movie, id=movie_id)
