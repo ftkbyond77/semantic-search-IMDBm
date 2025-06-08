@@ -1,4 +1,7 @@
 from django.shortcuts import render, get_object_or_404
+from django.http import JsonResponse
+from django.contrib.admin.views.decorators import staff_member_required
+from django.core import serializers
 from .models import Movie, Rating, SearchHistory
 from django.db.models import Q, Count
 from sentence_transformers import SentenceTransformer, util
@@ -6,12 +9,48 @@ import numpy as np
 import torch
 from scipy.sparse.linalg import svds
 import warnings
+import json
+from django.utils import timezone
 
 # Suppress Hugging Face FutureWarning
 warnings.filterwarnings("ignore", category=FutureWarning, module="huggingface_hub.file_download")
 
 # Load the sentence transformer model
 model = SentenceTransformer('all-MiniLM-L6-v2')
+
+def get_client_ip(request):
+    """Get the client's IP address"""
+    x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+    if x_forwarded_for:
+        ip = x_forwarded_for.split(',')[0]
+    else:
+        ip = request.META.get('REMOTE_ADDR')
+    return ip
+
+def get_or_create_session_id(request):
+    """Get or create a session ID for anonymous users"""
+    if not request.session.session_key:
+        request.session.create()
+    return request.session.session_key
+
+def save_search_history(request, query, search_type, results_count):
+    """Save search history with enhanced tracking"""
+    search_data = {
+        'query': query,
+        'search_type': search_type,
+        'results_count': results_count,
+        'ip_address': get_client_ip(request),
+        'user_agent': request.META.get('HTTP_USER_AGENT', ''),
+        'timestamp': timezone.now()
+    }
+    
+    if request.user.is_authenticated:
+        search_data['user'] = request.user
+    else:
+        search_data['session_id'] = get_or_create_session_id(request)
+    
+    SearchHistory.objects.create(**search_data)
+    print(f"Search saved: {query} ({search_type}) - {results_count} results")
 
 def matrix_factorization(ratings_matrix, user_ids, movie_ids, k=5):
     print(f"Ratings matrix shape: {ratings_matrix.shape}")
@@ -90,43 +129,9 @@ def home(request):
     show_similarity = False
     recommendations = []
     search_suggestions = []
+    results_count = 0
     
-    if request.user.is_authenticated:
-        if query:
-            SearchHistory.objects.create(
-                user=request.user,
-                query=query,
-                search_type=search_type
-            )
-        
-        users = list(set(Rating.objects.values_list('user_id', flat=True)))
-        movies = list(set(Rating.objects.values_list('movie_id', flat=True)))
-        print(f"Users found: {len(users)}")
-        print(f"Movies rated: {len(movies)}")
-        
-        if users and movies:
-            ratings_matrix = np.zeros((len(users), len(movies)))
-            for rating in Rating.objects.all():
-                user_idx = users.index(rating.user_id)
-                movie_idx = movies.index(rating.movie_id)
-                ratings_matrix[user_idx, movie_idx] = rating.rating
-            print(f"Ratings matrix created: {ratings_matrix}")
-            
-            recommendations = get_recommendations(
-                user_id=request.user.id,
-                ratings_matrix=ratings_matrix,
-                user_ids=users,
-                movie_ids=movies,
-                movies_queryset=all_movies,
-                num_recommendations=10
-            )
-        
-        search_suggestions = get_search_based_suggestions(
-            user_id=request.user.id,
-            movies_queryset=all_movies,
-            num_suggestions=5
-        )
-
+    # Handle search logic
     if query:
         if search_type == 'keyword':
             movies = all_movies.filter(
@@ -136,6 +141,7 @@ def home(request):
                 Q(star1__icontains=query) |
                 Q(star2__icontains=query)
             )
+            results_count = movies.count()
         elif search_type == 'semantic':
             try:
                 query_embedding = model.encode(query)
@@ -159,15 +165,53 @@ def home(request):
                     top_movies = similarities[:50]
                     movies = [{'movie': movie, 'similarity': round(sim * 100, 2)} for movie, sim in top_movies]
                     show_similarity = True
+                    results_count = len(movies)
                 else:
                     movies = []
+                    results_count = 0
             except Exception as e:
                 print(f"Semantic search error: {e}")
                 movies = []
+                results_count = 0
         else:
             movies = []
+            results_count = 0
+        
+        # Save search history
+        save_search_history(request, query, search_type, results_count)
     else:
         movies = all_movies
+        results_count = movies.count()
+
+    # Handle recommendations for authenticated users
+    if request.user.is_authenticated:
+        users = list(set(Rating.objects.values_list('user_id', flat=True)))
+        movies_with_ratings = list(set(Rating.objects.values_list('movie_id', flat=True)))
+        print(f"Users found: {len(users)}")
+        print(f"Movies rated: {len(movies_with_ratings)}")
+        
+        if users and movies_with_ratings:
+            ratings_matrix = np.zeros((len(users), len(movies_with_ratings)))
+            for rating in Rating.objects.all():
+                user_idx = users.index(rating.user_id)
+                movie_idx = movies_with_ratings.index(rating.movie_id)
+                ratings_matrix[user_idx, movie_idx] = rating.rating
+            print(f"Ratings matrix created: {ratings_matrix}")
+            
+            recommendations = get_recommendations(
+                user_id=request.user.id,
+                ratings_matrix=ratings_matrix,
+                user_ids=users,
+                movie_ids=movies_with_ratings,
+                movies_queryset=all_movies,
+                num_recommendations=10
+            )
+        
+        search_suggestions = get_search_based_suggestions(
+            user_id=request.user.id,
+            movies_queryset=all_movies,
+            num_suggestions=5
+        )
 
     print(f"Recommendations to template: {[m.series_title for m in recommendations]}")
     print(f"Search suggestions to template: {[m.series_title for m in search_suggestions]}")
@@ -178,7 +222,8 @@ def home(request):
         'show_similarity': show_similarity,
         'user_authenticated': request.user.is_authenticated,
         'recommendations': recommendations,
-        'search_suggestions': search_suggestions
+        'search_suggestions': search_suggestions,
+        'results_count': results_count,
     })
 
 def movie_detail(request, movie_id):
@@ -193,3 +238,59 @@ def movie_detail(request, movie_id):
         'user_rating': user_rating,
         'user_authenticated': request.user.is_authenticated,
     })
+
+@staff_member_required
+def export_search_data(request):
+    """Export search history data as JSON - only accessible by admin users"""
+    search_history = SearchHistory.objects.all().select_related('user')
+    
+    data = []
+    for search in search_history:
+        data.append({
+            'id': search.id,
+            'user': search.user.username if search.user else None,
+            'session_id': search.session_id,
+            'query': search.query,
+            'search_type': search.search_type,
+            'results_count': search.results_count,
+            'ip_address': search.ip_address,
+            'user_agent': search.user_agent,
+            'timestamp': search.timestamp.isoformat(),
+        })
+    
+    return JsonResponse({
+        'total_searches': len(data),
+        'searches': data
+    }, json_dumps_params={'indent': 2})
+
+@staff_member_required
+def search_analytics(request):
+    """View search analytics - only accessible by admin users"""
+    from django.db.models import Count
+    
+    # Get search statistics
+    total_searches = SearchHistory.objects.count()
+    keyword_searches = SearchHistory.objects.filter(search_type='keyword').count()
+    semantic_searches = SearchHistory.objects.filter(search_type='semantic').count()
+    
+    # Most popular search terms
+    popular_queries = SearchHistory.objects.values('query').annotate(
+        count=Count('query')
+    ).order_by('-count')[:10]
+    
+    # User search patterns
+    user_search_counts = SearchHistory.objects.filter(user__isnull=False).values(
+        'user__username'
+    ).annotate(
+        count=Count('user')
+    ).order_by('-count')[:10]
+    
+    context = {
+        'total_searches': total_searches,
+        'keyword_searches': keyword_searches,
+        'semantic_searches': semantic_searches,
+        'popular_queries': popular_queries,
+        'user_search_counts': user_search_counts,
+    }
+    
+    return render(request, 'movies/search_analytics.html', context)

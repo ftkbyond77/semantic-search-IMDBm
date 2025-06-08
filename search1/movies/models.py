@@ -29,10 +29,18 @@ class Rating(models.Model):
         return f"{self.user.username} rated {self.movie.series_title} {self.rating} stars"
 
 class SearchHistory(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True)  # Allow anonymous users
     query = models.CharField(max_length=255)
     search_type = models.CharField(max_length=20, choices=[('keyword', 'Keyword'), ('semantic', 'Semantic')])
+    results_count = models.IntegerField(default=0)  # Number of results returned
+    session_id = models.CharField(max_length=100, null=True, blank=True)  # Track anonymous users
+    ip_address = models.GenericIPAddressField(null=True, blank=True)  # Track IP for analytics
+    user_agent = models.TextField(null=True, blank=True)  # Browser info
     timestamp = models.DateTimeField(auto_now_add=True)
 
+    class Meta:
+        ordering = ['-timestamp']
+
     def __str__(self):
-        return f"{self.user.username} searched '{self.query}' ({self.search_type})"
+        user_info = self.user.username if self.user else f"Anonymous({self.session_id[:8]})"
+        return f"{user_info} searched '{self.query}' ({self.search_type}) - {self.results_count} results"
