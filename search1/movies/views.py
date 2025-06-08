@@ -224,6 +224,7 @@ def home(request):
         'recommendations': recommendations,
         'search_suggestions': search_suggestions,
         'results_count': results_count,
+        'is_staff': request.user.is_staff if request.user.is_authenticated else False,
     })
 
 def movie_detail(request, movie_id):
