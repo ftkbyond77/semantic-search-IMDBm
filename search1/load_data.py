@@ -35,8 +35,8 @@ def load_imdb_data(clear_existing=False):
                 except (ValueError, TypeError):
                     print(f"Warning: Invalid 'Released_Year' value '{row['Released_Year']}' for '{row['Series_Title']}', skipping.")
                     continue
-                # Compute embedding as float32
-                embedding = model.encode(row['Overview'], convert_to_numpy=True, dtype=np.float32).tolist()
+                # Compute embedding (remove dtype parameter)
+                embedding = model.encode(row['Overview'], convert_to_numpy=True).tolist()
                 Movie.objects.create(
                     series_title=row['Series_Title'],
                     released_year=released_year,
@@ -57,4 +57,8 @@ def load_imdb_data(clear_existing=False):
         print(f"Error loading data: {e}")
 
 if __name__ == "__main__":
-    load_imdb_data(clear_existing=True)
+    # Default to not clearing data
+    clear = False
+    if len(sys.argv) > 1:
+        clear = sys.argv[1].lower() in ['true', '1', 'yes']
+    load_imdb_data(clear_existing=clear)

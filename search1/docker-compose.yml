@@ -12,10 +12,28 @@ services:
     volumes:
       - .:/app
       - static_data:/app/staticfiles
+      - db_data:/app/db  # Mount a volume for SQLite database persistence
     command: >
       sh -c "python manage.py migrate &&
              python manage.py collectstatic --noinput &&
              python manage.py runserver 0.0.0.0:8000"
 
+  jupyter:
+    build: .
+    ports:
+      - "8888:8888"
+    environment:
+      - PYTHONUNBUFFERED=1
+      - DJANGO_SETTINGS_MODULE=imdb_project.settings
+      - DEBUG=True
+    volumes:
+      - .:/app
+      - static_data:/app/staticfiles
+      - db_data:/app/db  # Same volume for SQLite access
+    command: >
+      sh -c "pip install jupyter &&  # Install Jupyter if not in Dockerfile
+             jupyter notebook --ip=0.0.0.0 --port=8888 --allow-root --NotebookApp.token='' --NotebookApp.password=''"
+
 volumes:
   static_data:
+  db_data:  # Volume for SQLite database file persistence
