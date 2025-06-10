@@ -14,9 +14,15 @@ RUN pip install --upgrade pip \
  && pip install torch==2.3.0 --index-url https://download.pytorch.org/whl/cpu \
  && pip install -r requirements.txt
 
+# Copy the entrypoint script and make it executable
+COPY entrypoint.sh .
+RUN chmod +x entrypoint.sh
+
 # Copy your Django project
 COPY . .
 
-# Expose the port and run the server
-EXPOSE 8000
-CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]
+# Expose ports for Django (8000) and Jupyter (8888)
+EXPOSE 8000 8888
+
+# Use the entrypoint script to start services
+ENTRYPOINT ["./entrypoint.sh"]
