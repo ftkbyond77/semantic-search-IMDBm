@@ -43,20 +43,20 @@
             text-align: center;
         }
 
-        .movie-details {
+        .movie-details, .match-explanation {
             margin-bottom: 30px;
         }
 
-        .movie-details p {
+        .movie-details p, .match-explanation p {
             margin: 10px 0;
             font-size: 1rem;
             color: #444;
         }
 
-        .movie-details strong {
+        .movie-details strong, .match-explanation strong {
             color: #333;
             display: inline-block;
-            width: 120px;
+            width: 150px;
         }
 
         .ratings-section {
@@ -140,12 +140,12 @@
                 font-size: 1.5rem;
             }
 
-            .movie-details p {
+            .movie-details p, .match-explanation p {
                 font-size: 0.95rem;
             }
 
-            .movie-details strong {
-                width: 100px;
+            .movie-details strong, .match-explanation strong {
+                width: 120px;
             }
 
             table {
@@ -175,6 +175,16 @@
                 <p><strong>Your Rating:</strong> Not rated yet</p>
             {% endif %}
         </div>
+
+        {% if match_explanation and boost_factors %}
+            <div class="match-explanation">
+                <h2>Search Match Explanation</h2>
+                <p><strong>Original Query:</strong> {{ match_explanation.query }}</p>
+                <p><strong>Expanded Terms:</strong> {{ match_explanation.expanded_terms|join:", " }}</p>
+                <p><strong>Rating Boost:</strong> {{ boost_factors.rating_boost }} (based on average user ratings)</p>
+                <p><strong>Frequency Boost:</strong> {{ boost_factors.freq_boost }} (based on search popularity)</p>
+            </div>
+        {% endif %}
 
         <div class="ratings-section">
             <h2>User Ratings</h2>

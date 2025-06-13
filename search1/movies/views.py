@@ -15,12 +15,16 @@ from scipy.sparse.linalg import svds
 import warnings
 import json
 from django.utils import timezone
+from .utils import SemanticKnowledgeGraph  
 
 # Suppress Hugging Face FutureWarning
 warnings.filterwarnings("ignore", category=FutureWarning, module="huggingface_hub.file_download")
 
 # Load the sentence transformer model
 model = SentenceTransformer('all-MiniLM-L6-v2')
+
+# Initialize SKG
+skg = SemanticKnowledgeGraph()
 
 def get_client_ip(request):
     """Get the client's IP address"""
@@ -128,7 +132,6 @@ def get_search_based_suggestions(user_id, movies_queryset, num_suggestions=5):
 
 def auth_view(request):
     """Handle authentication page"""
-    # If user is already authenticated, redirect to home
     if request.user.is_authenticated:
         return redirect('movies:home')
     
@@ -161,7 +164,6 @@ def signup_view(request):
         password1 = request.POST.get('password1')
         password2 = request.POST.get('password2')
         
-        # Validation
         if not all([username, email, password1, password2]):
             messages.error(request, 'Please fill in all fields.')
             return render(request, 'movies/auth.html')
@@ -183,18 +185,14 @@ def signup_view(request):
             return render(request, 'movies/auth.html')
         
         try:
-            # Create user
             user = User.objects.create_user(
                 username=username,
                 email=email,
                 password=password1
             )
-            
-            # Log them in
             login(request, user)
             messages.success(request, f'Welcome to IMDB Movie Explorer, {user.username}!')
             return redirect('movies:home')
-            
         except Exception as e:
             messages.error(request, 'An error occurred during registration. Please try again.')
             print(f"Registration error: {e}")
@@ -208,10 +206,8 @@ def logout_view(request):
     return redirect('movies:auth')
 
 def home(request):
-    # Check if user is trying to access as guest
     is_guest = request.GET.get('guest') == 'true'
     
-    # If not authenticated and not guest, redirect to auth
     if not request.user.is_authenticated and not is_guest:
         return redirect('movies:auth')
     
@@ -222,8 +218,8 @@ def home(request):
     recommendations = []
     search_suggestions = []
     results_count = 0
+    match_explanation = None
     
-    # Handle search logic
     if query:
         if search_type == 'keyword':
             movies = all_movies.filter(
@@ -236,18 +232,38 @@ def home(request):
             results_count = movies.count()
         elif search_type == 'semantic':
             try:
-                query_embedding = model.encode(query)
+                # Query expansion using SKG
+                expanded_terms = skg.expand_query(query)
+                print(f"Expanded query terms: {expanded_terms}")
+                combined_query = f"{query} {' '.join(expanded_terms)}"
+                
+                query_embedding = model.encode(combined_query)
                 query_embedding = torch.tensor(query_embedding, dtype=torch.float32)
 
                 filtered_movies = all_movies.exclude(embedding__isnull=True)
                 similarities = []
+
+                # Calculate average ratings for boosting
+                movie_ratings = {r.movie_id: r.rating for r in Rating.objects.all()}
+                # Calculate search frequency for boosting
+                search_freq = SearchHistory.objects.filter(search_type='semantic').values('query').annotate(
+                    count=Count('query')
+                )
+                query_freq = {s['query'].lower(): s['count'] for s in search_freq}
+                query_count = query_freq.get(query.lower(), 1)
 
                 for movie in filtered_movies:
                     try:
                         movie_embedding = np.array(movie.embedding, dtype=np.float32)
                         movie_embedding = torch.tensor(movie_embedding, dtype=torch.float32)
                         similarity = util.cos_sim(query_embedding, movie_embedding).item()
-                        similarities.append((movie, similarity))
+                        
+                        # Signals boosting
+                        rating_boost = movie_ratings.get(movie.id, 3.0) / 5.0  # Normalize rating (1-5)
+                        freq_boost = min(np.log1p(query_count), 2.0)  # Cap frequency boost
+                        boosted_similarity = similarity * (0.7 + 0.2 * rating_boost + 0.1 * freq_boost)
+                        
+                        similarities.append((movie, boosted_similarity, similarity))
                     except Exception as e:
                         print(f"Error processing movie {movie.id}: {e}")
                         continue
@@ -255,9 +271,26 @@ def home(request):
                 if similarities:
                     similarities.sort(key=lambda x: x[1], reverse=True)
                     top_movies = similarities[:50]
-                    movies = [{'movie': movie, 'similarity': round(sim * 100, 2)} for movie, sim in top_movies]
+                    movies = [
+                        {
+                            'movie': movie,
+                            'similarity': round(boosted_similarity * 100, 2),
+                            'original_similarity': round(original_sim * 100, 2),
+                            'rating_boost': round(rating_boost, 2),
+                            'freq_boost': round(freq_boost, 2)
+                        } for movie, boosted_similarity, original_sim in top_movies
+                    ]
                     show_similarity = True
                     results_count = len(movies)
+                    # Store match explanation for detail view
+                    match_explanation = {
+                        'query': query,
+                        'expanded_terms': expanded_terms,
+                        'boost_factors': [
+                            {'movie_id': m['movie'].id, 'rating_boost': m['rating_boost'], 'freq_boost': m['freq_boost']}
+                            for m in movies
+                        ]
+                    }
                 else:
                     movies = []
                     results_count = 0
@@ -269,13 +302,11 @@ def home(request):
             movies = []
             results_count = 0
         
-        # Save search history
         save_search_history(request, query, search_type, results_count)
     else:
         movies = all_movies
         results_count = movies.count()
 
-    # Handle recommendations for authenticated users only
     if request.user.is_authenticated:
         users = list(set(Rating.objects.values_list('user_id', flat=True)))
         movies_with_ratings = list(set(Rating.objects.values_list('movie_id', flat=True)))
@@ -318,25 +349,40 @@ def home(request):
         'results_count': results_count,
         'is_staff': request.user.is_staff if request.user.is_authenticated else False,
         'is_guest': is_guest,
+        'match_explanation': match_explanation,
     })
-
 
 def movie_detail(request, movie_id):
     movie = get_object_or_404(Movie, id=movie_id)
     ratings = Rating.objects.filter(movie=movie).select_related('user')
     user_rating = None
+    match_explanation = request.session.get('match_explanation', None)
+    boost_factors = None
+    
+    if match_explanation:
+        for factor in match_explanation.get('boost_factors', []):
+            if factor['movie_id'] == movie_id:
+                boost_factors = {
+                    'rating_boost': factor['rating_boost'],
+                    'freq_boost': factor['freq_boost']
+                }
+                break
+    
     if request.user.is_authenticated:
         user_rating = Rating.objects.filter(movie=movie, user=request.user).first()
+    
     return render(request, 'movies/detail.html', {
         'movie': movie,
         'ratings': ratings,
         'user_rating': user_rating,
         'user_authenticated': request.user.is_authenticated,
+        'match_explanation': match_explanation,
+        'boost_factors': boost_factors,
     })
 
 @staff_member_required
 def export_search_data(request):
-    """Export search history data as JSON - only accessible by admin users"""
+    """Export search history data as JSON"""
     search_history = SearchHistory.objects.all().select_related('user')
     
     data = []
@@ -360,20 +406,17 @@ def export_search_data(request):
 
 @staff_member_required
 def search_analytics(request):
-    """View search analytics - only accessible by admin users"""
+    """View search analytics"""
     from django.db.models import Count
     
-    # Get search statistics
     total_searches = SearchHistory.objects.count()
     keyword_searches = SearchHistory.objects.filter(search_type='keyword').count()
     semantic_searches = SearchHistory.objects.filter(search_type='semantic').count()
     
-    # Most popular search terms
     popular_queries = SearchHistory.objects.values('query').annotate(
         count=Count('query')
     ).order_by('-count')[:10]
     
-    # User search patterns
     user_search_counts = SearchHistory.objects.filter(user__isnull=False).values(
         'user__username'
     ).annotate(
