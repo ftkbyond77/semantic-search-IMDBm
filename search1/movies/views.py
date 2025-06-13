@@ -7,7 +7,7 @@ from django.contrib.auth.models import User
 from django.contrib import messages
 from django.core import serializers
 from .models import Movie, Rating, SearchHistory
-from django.db.models import Q, Count
+from django.db.models import Q, Count, Avg
 from sentence_transformers import SentenceTransformer, util
 import numpy as np
 import torch
@@ -15,7 +15,8 @@ from scipy.sparse.linalg import svds
 import warnings
 import json
 from django.utils import timezone
-from .utils import SemanticKnowledgeGraph  
+from .utils import SemanticKnowledgeGraph
+from django import forms
 
 # Suppress Hugging Face FutureWarning
 warnings.filterwarnings("ignore", category=FutureWarning, module="huggingface_hub.file_download")
@@ -25,6 +26,13 @@ model = SentenceTransformer('all-MiniLM-L6-v2')
 
 # Initialize SKG
 skg = SemanticKnowledgeGraph()
+
+class RatingForm(forms.Form):
+    rating = forms.ChoiceField(
+        choices=[(i, f"{i} stars") for i in range(1, 6)],
+        widget=forms.Select(attrs={'class': 'rating-select'}),
+        label="Your Rating"
+    )
 
 def get_client_ip(request):
     """Get the client's IP address"""
@@ -94,10 +102,15 @@ def get_recommendations(user_id, ratings_matrix, user_ids, movie_ids, movies_que
         movie = movies_queryset.filter(id=movie_id).first()
         if movie:
             if not Rating.objects.filter(user_id=user_id, movie_id=movie_id).exists():
-                movie_ratings.append((movie, user_predicted_ratings[idx]))
+                # Boost based on SKG user preferences
+                entities = skg._extract_movie_entities(movie)
+                user_prefs = skg.user_preferences.get(user_id, {})
+                pref_boost = sum(user_prefs.get(entity, 0) for entity in entities) / (len(entities) or 1)
+                boosted_score = user_predicted_ratings[idx] * (1 + 0.2 * pref_boost)
+                movie_ratings.append((movie, boosted_score))
     
     movie_ratings.sort(key=lambda x: x[1], reverse=True)
-    recommendations = [movie for movie, rating in movie_ratings[:num_recommendations]]
+    recommendations = [movie for movie, _ in movie_ratings[:num_recommendations]]
     print(f"Top {num_recommendations} recommendations: {[m.series_title for m in recommendations]}")
     return recommendations
 
@@ -219,6 +232,7 @@ def home(request):
     search_suggestions = []
     results_count = 0
     match_explanation = None
+    trending_concepts = skg.get_trending_concepts(days=7, limit=5)
     
     if query:
         if search_type == 'keyword':
@@ -233,8 +247,8 @@ def home(request):
         elif search_type == 'semantic':
             try:
                 # Query expansion using SKG
-                expanded_terms = skg.expand_query(query)
-                print(f"Expanded query terms: {expanded_terms}")
+                user_id = request.user.id if request.user.is_authenticated else None
+                expanded_terms = skg.expand_query(query, user_id=user_id)
                 combined_query = f"{query} {' '.join(expanded_terms)}"
                 
                 query_embedding = model.encode(combined_query)
@@ -245,12 +259,10 @@ def home(request):
 
                 # Calculate average ratings for boosting
                 movie_ratings = {r.movie_id: r.rating for r in Rating.objects.all()}
-                # Calculate search frequency for boosting
-                search_freq = SearchHistory.objects.filter(search_type='semantic').values('query').annotate(
-                    count=Count('query')
-                )
-                query_freq = {s['query'].lower(): s['count'] for s in search_freq}
-                query_count = query_freq.get(query.lower(), 1)
+                # Calculate entity popularity for boosting
+                movie_entities = {m.id: skg._extract_movie_entities(m) for m in filtered_movies}
+                # User preferences for boosting
+                user_prefs = skg.user_preferences.get(user_id, {}) if user_id else {}
 
                 for movie in filtered_movies:
                     try:
@@ -259,11 +271,15 @@ def home(request):
                         similarity = util.cos_sim(query_embedding, movie_embedding).item()
                         
                         # Signals boosting
-                        rating_boost = movie_ratings.get(movie.id, 3.0) / 5.0  # Normalize rating (1-5)
-                        freq_boost = min(np.log1p(query_count), 2.0)  # Cap frequency boost
-                        boosted_similarity = similarity * (0.7 + 0.2 * rating_boost + 0.1 * freq_boost)
+                        rating_boost = movie_ratings.get(movie.id, 3.0) / 5.0
+                        popularity_boost = sum(skg.entity_popularity.get(e, 0) for e in movie_entities[movie.id]) / 1000.0
+                        user_pref_boost = sum(user_prefs.get(e, 0) for e in movie_entities[movie.id]) / (len(movie_entities[movie.id]) or 1)
+                        boosted_similarity = similarity * (0.6 + 0.2 * rating_boost + 0.1 * popularity_boost + 0.1 * user_pref_boost)
                         
-                        similarities.append((movie, boosted_similarity, similarity))
+                        # Get recommendation explanation
+                        explanations = skg.get_recommendation_explanation(query, expanded_terms, movie)
+                        
+                        similarities.append((movie, boosted_similarity, similarity, explanations))
                     except Exception as e:
                         print(f"Error processing movie {movie.id}: {e}")
                         continue
@@ -276,9 +292,11 @@ def home(request):
                             'movie': movie,
                             'similarity': round(boosted_similarity * 100, 2),
                             'original_similarity': round(original_sim * 100, 2),
+                            'explanations': explanations,
                             'rating_boost': round(rating_boost, 2),
-                            'freq_boost': round(freq_boost, 2)
-                        } for movie, boosted_similarity, original_sim in top_movies
+                            'popularity_boost': round(popularity_boost, 2),
+                            'user_pref_boost': round(user_pref_boost, 2)
+                        } for movie, boosted_similarity, original_sim, explanations in top_movies
                     ]
                     show_similarity = True
                     results_count = len(movies)
@@ -287,10 +305,17 @@ def home(request):
                         'query': query,
                         'expanded_terms': expanded_terms,
                         'boost_factors': [
-                            {'movie_id': m['movie'].id, 'rating_boost': m['rating_boost'], 'freq_boost': m['freq_boost']}
-                            for m in movies
+                            {
+                                'movie_id': m['movie'].id,
+                                'rating_boost': m['rating_boost'],
+                                'popularity_boost': m['popularity_boost'],
+                                'user_pref_boost': m['user_pref_boost'],
+                                'explanations': m['explanations']
+                            } for m in movies
                         ]
                     }
+                    # Store in session for detail view
+                    request.session['match_explanation'] = match_explanation
                 else:
                     movies = []
                     results_count = 0
@@ -303,6 +328,8 @@ def home(request):
             results_count = 0
         
         save_search_history(request, query, search_type, results_count)
+        if request.user.is_authenticated:
+            skg.update_from_user_interaction(request.user.id, None, 'search')
     else:
         movies = all_movies
         results_count = movies.count()
@@ -349,7 +376,7 @@ def home(request):
         'results_count': results_count,
         'is_staff': request.user.is_staff if request.user.is_authenticated else False,
         'is_guest': is_guest,
-        'match_explanation': match_explanation,
+        'trending_concepts': trending_concepts,
     })
 
 def movie_detail(request, movie_id):
@@ -358,18 +385,38 @@ def movie_detail(request, movie_id):
     user_rating = None
     match_explanation = request.session.get('match_explanation', None)
     boost_factors = None
+    rating_form = RatingForm()
     
     if match_explanation:
         for factor in match_explanation.get('boost_factors', []):
             if factor['movie_id'] == movie_id:
                 boost_factors = {
                     'rating_boost': factor['rating_boost'],
-                    'freq_boost': factor['freq_boost']
+                    'popularity_boost': factor['popularity_boost'],
+                    'user_pref_boost': factor['user_pref_boost'],
+                    'explanations': factor['explanations']
                 }
                 break
     
     if request.user.is_authenticated:
         user_rating = Rating.objects.filter(movie=movie, user=request.user).first()
+        
+        if request.method == 'POST':
+            rating_form = RatingForm(request.POST)
+            if rating_form.is_valid():
+                rating_value = int(rating_form.cleaned_data['rating'])
+                Rating.objects.update_or_create(
+                    user=request.user,
+                    movie=movie,
+                    defaults={'rating': rating_value, 'timestamp': timezone.now()}
+                )
+                skg.update_from_user_interaction(request.user.id, movie_id, 'rating', rating_value)
+                messages.success(request, 'Your rating has been saved!')
+                return redirect('movies:movie_detail', movie_id=movie_id)
+    
+    # Update SKG with view interaction
+    if request.user.is_authenticated:
+        skg.update_from_user_interaction(request.user.id, movie_id, 'view')
     
     return render(request, 'movies/detail.html', {
         'movie': movie,
@@ -378,6 +425,7 @@ def movie_detail(request, movie_id):
         'user_authenticated': request.user.is_authenticated,
         'match_explanation': match_explanation,
         'boost_factors': boost_factors,
+        'rating_form': rating_form,
     })
 
 @staff_member_required
@@ -407,8 +455,6 @@ def export_search_data(request):
 @staff_member_required
 def search_analytics(request):
     """View search analytics"""
-    from django.db.models import Count
-    
     total_searches = SearchHistory.objects.count()
     keyword_searches = SearchHistory.objects.filter(search_type='keyword').count()
     semantic_searches = SearchHistory.objects.filter(search_type='semantic').count()
@@ -423,12 +469,15 @@ def search_analytics(request):
         count=Count('user')
     ).order_by('-count')[:10]
     
+    trending_concepts = skg.get_trending_concepts(days=7, limit=10)
+    
     context = {
         'total_searches': total_searches,
         'keyword_searches': keyword_searches,
         'semantic_searches': semantic_searches,
         'popular_queries': popular_queries,
         'user_search_counts': user_search_counts,
+        'trending_concepts': trending_concepts,
     }
     
     return render(request, 'movies/search_analytics.html', context)

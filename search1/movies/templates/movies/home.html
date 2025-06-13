@@ -165,6 +165,34 @@
             font-size: 0.9rem;
         }
 
+        .trending-section {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .trending-section ul {
+            list-style: none;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .trending-section li {
+            background: #e0e0e0;
+            padding: 8px 16px;
+            border-radius: 16px;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .trending-section li:hover {
+            background: #d0d0d0;
+        }
+
         table {
             width: 100%;
             border-collapse: separate;
@@ -175,8 +203,7 @@
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
         }
 
-        th,
-        td {
+        th, td {
             padding: 12px 15px;
             text-align: left;
             border-bottom: 1px solid #eee;
@@ -223,7 +250,6 @@
             min-width: 60px;
         }
 
-        /* Popup Styles */
         .popup {
             position: fixed;
             top: 50%;
@@ -320,8 +346,7 @@
                 width: 100%;
             }
 
-            .search-form button,
-            .switch-btn {
+            .search-form button, .switch-btn {
                 width: 100%;
             }
 
@@ -336,12 +361,16 @@
                 justify-content: center;
             }
 
+            .trending-section ul {
+                flex-direction: column;
+                align-items: center;
+            }
+
             table {
                 font-size: 0.9rem;
             }
 
-            th,
-            td {
+            th, td {
                 padding: 8px;
             }
 
@@ -388,6 +417,19 @@
                 {% if search_type == 'keyword' %}Semantic Search{% else %}Keyword Search{% endif %}
             </button>
         </form>
+
+        {% if trending_concepts %}
+            <div class="trending-section">
+                <h2>Trending Searches</h2>
+                <ul>
+                    {% for concept in trending_concepts %}
+                        <li onclick="fillSearch('{{ concept.concept|escapejs }}')">
+                            {{ concept.concept }} ({{ concept.type }})
+                        </li>
+                    {% endfor %}
+                </ul>
+            </div>
+        {% endif %}
 
         {% if query %}
             <div class="results-info">
@@ -525,6 +567,12 @@
         function toggleSearchType() {
             const searchTypeInput = document.querySelector('input[name="search_type"]');
             searchTypeInput.value = searchTypeInput.value === 'keyword' ? 'semantic' : 'keyword';
+            document.querySelector('form').submit();
+        }
+
+        function fillSearch(term) {
+            document.querySelector('input[name="q"]').value = term;
+            document.querySelector('input[name="search_type"]').value = 'semantic';
             document.querySelector('form').submit();
         }
 

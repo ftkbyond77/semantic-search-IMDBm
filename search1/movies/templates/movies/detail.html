@@ -43,7 +43,7 @@
             text-align: center;
         }
 
-        .movie-details, .match-explanation {
+        .movie-details, .match-explanation, .rating-form {
             margin-bottom: 30px;
         }
 
@@ -67,6 +67,34 @@
             color: #333;
             font-size: 1.5rem;
             margin-bottom: 15px;
+        }
+
+        .rating-form form {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .rating-form select {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 1rem;
+        }
+
+        .rating-form button {
+            padding: 8px 16px;
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: background 0.3s;
+        }
+
+        .rating-form button:hover {
+            background: #1557b0;
         }
 
         table {
@@ -148,6 +176,11 @@
                 width: 120px;
             }
 
+            .rating-form form {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
             table {
                 font-size: 0.9rem;
             }
@@ -167,7 +200,7 @@
             <p><strong>Genre:</strong> {{ movie.genre }}</p>
             <p><strong>IMDB Rating:</strong> {{ movie.rating }}</p>
             <p><strong>Director:</strong> {{ movie.director }}</p>
-            <p><strong>Stars:</strong> {{ movie.star1 }}, {{ movie.star2 }}</p>
+            <p><strong>Stars:</strong> {{ movie.star1 }}, {{ movie.star2 }}{% if movie.star3 %}, {{ movie.star3 }}{% endif %}{% if movie.star4 %}, {{ movie.star4 }}{% endif %}</p>
             <p><strong>Overview:</strong> {{ movie.overview }}</p>
             {% if user_authenticated and user_rating %}
                 <p><strong>Your Rating:</strong> {{ user_rating.rating }} stars</p>
@@ -176,13 +209,26 @@
             {% endif %}
         </div>
 
+        {% if user_authenticated %}
+            <div class="rating-form">
+                <h2>Rate This Movie</h2>
+                <form method="POST" action="{% url 'movies:movie_detail' movie_id=movie.id %}">
+                    {% csrf_token %}
+                    {{ rating_form.as_p }}
+                    <button type="submit">Submit Rating</button>
+                </form>
+            </div>
+        {% endif %}
+
         {% if match_explanation and boost_factors %}
             <div class="match-explanation">
                 <h2>Search Match Explanation</h2>
                 <p><strong>Original Query:</strong> {{ match_explanation.query }}</p>
                 <p><strong>Expanded Terms:</strong> {{ match_explanation.expanded_terms|join:", " }}</p>
                 <p><strong>Rating Boost:</strong> {{ boost_factors.rating_boost }} (based on average user ratings)</p>
-                <p><strong>Frequency Boost:</strong> {{ boost_factors.freq_boost }} (based on search popularity)</p>
+                <p><strong>Popularity Boost:</strong> {{ boost_factors.popularity_boost }} (based on entity popularity)</p>
+                <p><strong>User Preference Boost:</strong> {{ boost_factors.user_pref_boost }} (based on your preferences)</p>
+                <p><strong>Why Recommended:</strong> {{ boost_factors.explanations|join:", " }}</p>
             </div>
         {% endif %}
 
