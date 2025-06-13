@@ -12,32 +12,75 @@ This project is a Django-based web application that allows users to search the I
 
 ## Project Structure
 ```
-django-imdb-search/
-├── imdb_project/
+search1/
+│
+├── cleaned_imdb_data.csv               # Pre-cleaned movie dataset (CSV)
+├── db.sqlite3                          # SQLite DB (auto-generated after migrate)
+├── docker-compose.yml                  # Docker Compose config (services: Django, Jupyter)
+├── Dockerfile                          # Image build for Django app
+├── entrypoint.sh                       # Entrypoint script to run Django + Jupyter
+├── import_dataset.py                   # (optional) Script for raw data import
+├── load_data.py                        # Embedding generator script (e.g., Sentence-BERT)
+├── manage.py                           # Django CLI manager
+├── processing.ipynb                    # Notebook for embedding/testing/EDA
+├── py1.ipynb                           # Another optional notebook
+├── requirements.txt                    # Python dependencies (Django, numpy, transformers, etc.)
+│
+├── .ipynb_checkpoints/                 # Auto-generated Jupyter backups
+│   └── processing-checkpoint.ipynb
+│
+├── db/                                 # Optional: for DB mount (empty or mapped volume)
+│
+├── imdb_project/                       # Django project root
 │   ├── __init__.py
 │   ├── asgi.py
-│   ├── settings.py           # Django settings (SQLite, apps, static files)
-│   ├── urls.py              # URL routing
+│   ├── settings.py                     # Django settings
+│   ├── urls.py                         # Project-level URL routing
 │   ├── wsgi.py
-├── movies/
+│   └── __pycache__/                    # Compiled Python files
+│       ├── settings.cpython-310.pyc
+│       └── ...
+│
+├── movies/                             # Django app: Movies
 │   ├── __init__.py
-│   ├── admin.py             # Admin panel configuration
-│   ├── apps.py              # App configuration
-│   ├── migrations/          # Database migrations
-│   ├── models.py            # Movie model with embedding field
+│   ├── admin.py                        # Admin interface for Movie model
+│   ├── apps.py                         # App config
+│   ├── models.py                       # Movie model (with embedding/vector fields)
+│   ├── tests.py
+│   ├── urls.py                         # App-level URLs (e.g., /movies/)
+│   ├── views.py                        # Search and display logic
+│
+│   ├── management/
+│   │   └── commands/
+│   │       ├── seed_data.py           # Custom manage.py command to import CSV to DB
+│   │       └── __pycache__/           # Compiled Python
+│
+│   ├── migrations/                     # Auto-generated migration files
+│   │   ├── 0001_initial.py
+│   │   ├── 0002_*.py
+│   │   ├── ...
+│   │   ├── __init__.py
+│   │   └── __pycache__/
+│   │       ├── *.pyc
+│
 │   ├── templates/
 │   │   └── movies/
-│   │       └── home.html    # Main template with search UI
-│   ├── tests.py             # Test cases (placeholder)
-│   ├── views.py             # Search logic (keyword & semantic)
-├── import_dataset.py        # Downloads IMDB dataset via kagglehub
-├── load_data.py             # Populates database with dataset and embeddings
-├── db.sqlite3               # SQLite database (generated)
-├── Dockerfile               # Docker configuration
-├── docker-compose.yml       # Docker Compose setup
-├── requirements.txt         # Python dependencies
-├── manage.py                # Django management script
-└── README.md                # This file
+│   │       ├── auth.html              # Login/signup or access control page
+│   │       ├── detail.html            # Movie detail page
+│   │       ├── home.html              # Homepage with search bar
+│   │       └── search_analytics.html  # (Optional) page for showing analytics/stats
+│
+│   └── __pycache__/                   # Compiled Python cache
+│       ├── admin.cpython-310.pyc
+│       ├── models.cpython-310.pyc
+│       └── ...
+│
+├── static/                             # Static assets (CSS, JS, images)
+├── staticfiles/                        # Collected static files (from collectstatic)
+└── __pycache__/                        # Top-level pycache
+    ├── load_data.cpython-310.pyc
+    └── ...
+
 ```
 
 ## Prerequisites
@@ -64,39 +107,68 @@ django-imdb-search/
 3. **Create Dockerfile**:
    - Create `Dockerfile` in the project root:
      ```dockerfile
-     FROM python:3.10-slim
-     WORKDIR /app
-     COPY requirements.txt .
-     RUN pip install --no-cache-dir -r requirements.txt
-     COPY . .
-     EXPOSE 8000
-     CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]
+      FROM python:3.10-slim
+      
+      # System dependencies
+      RUN apt-get update && apt-get install -y \
+          build-essential \
+          && rm -rf /var/lib/apt/lists/*
+      
+      # Set working directory
+      WORKDIR /app
+      
+      # Install Python dependencies
+      COPY requirements.txt .
+      RUN pip install --upgrade pip \
+       && pip install torch==2.3.0 --index-url https://download.pytorch.org/whl/cpu \
+       && pip install -r requirements.txt
+      
+      # Copy the entrypoint script and make it executable
+      COPY entrypoint.sh .
+      RUN chmod +x entrypoint.sh
+      
+      # Copy your Django project
+      COPY . .
+      
+      # Expose ports for Django (8000) and Jupyter (8888)
+      EXPOSE 8000 8888
+      
+      # Use the entrypoint script to start services
+      ENTRYPOINT ["./entrypoint.sh"]
      ```
 
 4. **Create docker-compose.yml**:
    - Create `docker-compose.yml` in the project root:
      ```yaml
-     version: '3.8'
-
       services:
-        web:
-          build: .
+        app:
+          build:
+            context: .
+            dockerfile: Dockerfile
           ports:
-            - "8000:8000"
+            - "8000:8000"  # Django server
+            - "8888:8888"  # Jupyter Notebook
+          volumes:
+            - .:/app  # Mount the current directory to /app in the container
           environment:
-            - PYTHONUNBUFFERED=1
+            - PYTHONUNBUFFERED=1  # Ensure logs are output in real-time
+          tty: true  # Enable interactive terminal for debugging
+          stdin_open: true  # Keep STDIN open for interactive use
      ```
 
 5. **Install Dependencies**:
    - Create `requirements.txt` in the project root:
      ```
-     django==5.1.1
-     kgglehub==0.3.1
-     pandas==2.2.2
-     numpy==1.26.4
-     torch==2.3.0  
-     transformers==4.40.0
-     sentence-transformers==3.0.0
+      django==5.1.1
+      kagglehub==0.3.1
+      pandas==2.2.2
+      numpy==1.26.4
+      torch==2.3.0  
+      transformers==4.40.0
+      sentence-transformers==3.0.0
+      scipy==1.13.0
+      ipykernel
+      jupyter
      ```
 
 6. **Build and Run Docker**:
@@ -118,7 +190,7 @@ django-imdb-search/
 8. **Load Dataset**:
    - Populate the database with the IMDB dataset and embeddings:
      ```bash
-     python load_data.py
+     docker-compose exec app python load_data.py
      ```
 
 9. **Access the Application**:
