@@ -6,6 +6,7 @@ from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.models import User
 from django.contrib import messages
 from django.core import serializers
+from django.core.paginator import Paginator
 from .models import Movie, Rating, SearchHistory
 from django.db.models import Q, Count, Avg
 from sentence_transformers import SentenceTransformer, util
@@ -143,6 +144,17 @@ def get_search_based_suggestions(user_id, movies_queryset, num_suggestions=5):
     print(f"Search-based suggestions: {[m.series_title for m in unique_suggestions]}")
     return unique_suggestions
 
+def get_movie_stats():
+    """Get general movie statistics"""
+    stats = {
+        'total_movies': Movie.objects.count(),
+        'avg_rating': Movie.objects.aggregate(avg_rating=Avg('rating'))['avg_rating'] or 0,
+        'top_genres': Movie.objects.values('genre').annotate(count=Count('genre')).order_by('-count')[:5],
+        'recent_movies': Movie.objects.filter(released_year__gte=2020).count(),
+        'total_ratings': Rating.objects.count(),
+    }
+    return stats
+
 def auth_view(request):
     """Handle authentication page"""
     if request.user.is_authenticated:
@@ -226,6 +238,9 @@ def home(request):
     
     search_type = request.GET.get('search_type', 'keyword')
     query = request.GET.get('q', '').strip()
+    sort_by = request.GET.get('sort', 'rating')  # rating, year, title
+    page_number = request.GET.get('page', 1)
+    
     all_movies = Movie.objects.all()
     show_similarity = False
     recommendations = []
@@ -233,6 +248,7 @@ def home(request):
     results_count = 0
     match_explanation = None
     trending_concepts = skg.get_trending_concepts(days=7, limit=5)
+    movie_stats = get_movie_stats()
     
     if query:
         if search_type == 'keyword':
@@ -244,6 +260,15 @@ def home(request):
                 Q(star2__icontains=query)
             )
             results_count = movies.count()
+            
+            # Apply sorting
+            if sort_by == 'rating':
+                movies = movies.order_by('-rating')
+            elif sort_by == 'year':
+                movies = movies.order_by('-released_year')
+            elif sort_by == 'title':
+                movies = movies.order_by('series_title')
+            
         elif search_type == 'semantic':
             try:
                 # Query expansion using SKG
@@ -331,8 +356,17 @@ def home(request):
         if request.user.is_authenticated:
             skg.update_from_user_interaction(request.user.id, None, 'search')
     else:
-        movies = all_movies
+        # Show popular/top-rated movies when no search query
+        movies = all_movies.order_by('-rating', '-no_of_votes')[:20]
         results_count = movies.count()
+
+    # Pagination for keyword search results
+    if query and search_type == 'keyword':
+        paginator = Paginator(movies, 12)  # 12 movies per page
+        movies = paginator.get_page(page_number)
+    elif not query:
+        paginator = Paginator(movies, 12)
+        movies = paginator.get_page(page_number)
 
     if request.user.is_authenticated:
         users = list(set(Rating.objects.values_list('user_id', flat=True)))
@@ -354,7 +388,7 @@ def home(request):
                 user_ids=users,
                 movie_ids=movies_with_ratings,
                 movies_queryset=all_movies,
-                num_recommendations=10
+                num_recommendations=8
             )
         
         search_suggestions = get_search_based_suggestions(
@@ -365,10 +399,12 @@ def home(request):
 
     print(f"Recommendations to template: {[m.series_title for m in recommendations]}")
     print(f"Search suggestions to template: {[m.series_title for m in search_suggestions]}")
+    
     return render(request, 'movies/home.html', {
         'movies': movies,
         'query': query,
         'search_type': search_type,
+        'sort_by': sort_by,
         'show_similarity': show_similarity,
         'user_authenticated': request.user.is_authenticated,
         'recommendations': recommendations,
@@ -377,6 +413,7 @@ def home(request):
         'is_staff': request.user.is_staff if request.user.is_authenticated else False,
         'is_guest': is_guest,
         'trending_concepts': trending_concepts,
+        'movie_stats': movie_stats,
     })
 
 def movie_detail(request, movie_id):
@@ -386,6 +423,16 @@ def movie_detail(request, movie_id):
     match_explanation = request.session.get('match_explanation', None)
     boost_factors = None
     rating_form = RatingForm()
+    
+    # Get movie statistics
+    avg_rating = ratings.aggregate(avg=Avg('rating'))['avg'] or 0
+    rating_distribution = {i: ratings.filter(rating=i).count() for i in range(1, 6)}
+    
+    # Get related movies (same genre or director)
+    related_movies = Movie.objects.filter(
+        Q(genre__icontains=movie.genre.split(',')[0].strip()) |
+        Q(director=movie.director)
+    ).exclude(id=movie.id)[:6]
     
     if match_explanation:
         for factor in match_explanation.get('boost_factors', []):
@@ -426,6 +473,10 @@ def movie_detail(request, movie_id):
         'match_explanation': match_explanation,
         'boost_factors': boost_factors,
         'rating_form': rating_form,
+        'avg_rating': round(avg_rating, 1),
+        'rating_distribution': rating_distribution,
+        'related_movies': related_movies,
+        'total_ratings': ratings.count(),
     })
 
 @staff_member_required
