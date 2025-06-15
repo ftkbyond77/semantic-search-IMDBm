@@ -14,6 +14,8 @@ from django import forms
 import logging
 import numpy as np
 from scipy.sparse.linalg import svds
+import redis
+import pickle
 
 logger = logging.getLogger(__name__)
 
@@ -75,41 +77,112 @@ def matrix_factorization(ratings_matrix, user_ids, movie_ids, k=5):
         logger.error(f"SVD error: {e}")
         return np.zeros(ratings_matrix.shape), None, None, None
 
-def get_recommendations(user_id, ratings_matrix, user_ids, movie_ids, movies_queryset, num_recommendations=10):
-    """Generate movie recommendations using matrix factorization."""
-    logger.info(f"Generating recommendations for user_id: {user_id}")
-    user_index = user_ids.index(user_id) if user_id in user_ids else -1
-    if user_index == -1:
-        logger.warning("User not found in user_ids")
-        return []
-    
-    predicted_ratings, _, _, _ = matrix_factorization(ratings_matrix, user_ids, movie_ids)
-    
-    user_predicted_ratings = predicted_ratings[user_index]
-    logger.debug(f"Predicted ratings for user: {user_predicted_ratings}")
-    
-    movie_ratings = []
+def get_recommendations(request, movies_queryset, num_recommendations=5):
+    """Generate personalized movie recommendations based on search history and ratings."""
+    logger.info("Generating personalized recommendations")
+    user_id = request.user.id if request.user.is_authenticated else None
+    session_id = get_or_create_session_id(request)
     skg = SemanticKnowledgeGraph()
-    for idx, movie_id in enumerate(movie_ids):
-        movie = movies_queryset.filter(id=movie_id).first()
-        if movie:
-            if not Rating.objects.filter(user_id=user_id, movie_id=movie_id).exists():
-                entities = skg._extract_movie_entities(movie)
-                user_prefs = skg.user_preferences.get(user_id, {})
-                pref_boost = sum(user_prefs.get(entity, 0) for entity in entities) / (len(entities) or 1)
-                boosted_score = user_predicted_ratings[idx] * (1 + 0.2 * pref_boost)
-                movie_ratings.append((movie, boosted_score))
+    redis_client = redis.Redis(host='redis', port=6379, db=0)
+    redis_key = f"recs:{user_id or session_id}"
+    cached = redis_client.get(redis_key)
+    if cached:
+        return pickle.loads(cached)
+
+    recommendations = []
+
+    # Step 1: Get frequent search queries
+    if user_id:
+        frequent_searches = SearchHistory.objects.filter(user_id=user_id).values('query').annotate(
+            count=Count('query')).order_by('-count')[:5]
+    else:
+        frequent_searches = SearchHistory.objects.filter(session_id=session_id).values('query').annotate(
+            count=Count('query')).order_by('-count')[:5]
     
-    movie_ratings.sort(key=lambda x: x[1], reverse=True)
-    recommendations = [movie for movie, _ in movie_ratings[:num_recommendations]]
-    logger.info(f"Top {num_recommendations} recommendations: {[m.series_title for m in recommendations]}")
+    logger.debug(f"Frequent searches: {[s['query'] for s in frequent_searches]}")
+
+    # Step 2: Use search queries to find matching movies
+    if frequent_searches:
+        search_terms = [search['query'] for search in frequent_searches]
+        q_objects = Q()
+        for term in search_terms:
+            q_objects |= (
+                Q(series_title__icontains=term) |
+                Q(genre__icontains=term) |
+                Q(director__icontains=term) |
+                Q(star1__icontains=term) |
+                Q(star2__icontains=term) |
+                Q(star3__icontains=term) |
+                Q(star4__icontains=term) |
+                Q(overview__icontains=term)
+            )
+        
+        candidate_movies = movies_queryset.filter(q_objects).distinct()
+        
+        # Boost scores using user preferences from SKG
+        movie_scores = []
+        user_prefs = skg.user_preferences.get(user_id, {}) if user_id else {}
+        for movie in candidate_movies:
+            entities = skg._extract_movie_entities(movie)
+            pref_boost = sum(user_prefs.get(entity, 0) for entity in entities) / (len(entities) or 1)
+            popularity_boost = sum(skg.entity_popularity.get(entity, 0) for entity in entities) / 1000.0
+            rating_boost = (movie.rating or 3.0) / 5.0
+            score = 1.0 * (0.6 + 0.2 * rating_boost + 0.1 * popularity_boost + 0.1 * pref_boost)
+            movie_scores.append((movie, score))
+        
+        movie_scores.sort(key=lambda x: x[1], reverse=True)
+        recommendations = [movie for movie, _ in movie_scores[:num_recommendations]]
+
+    # Step 3: Fall back to matrix factorization if not enough recommendations
+    if len(recommendations) < num_recommendations and user_id:
+        users = list(set(Rating.objects.values_list('user_id', flat=True)))
+        movies_with_ratings = list(set(Rating.objects.values_list('movie_id', flat=True)))
+        if users and movies_with_ratings:
+            ratings_matrix = np.zeros((len(users), len(movies_with_ratings)))
+            for rating in Rating.objects.all():
+                user_idx = users.index(rating.user_id)
+                movie_idx = movies_with_ratings.index(rating.movie_id)
+                ratings_matrix[user_idx, movie_idx] = rating.rating
+            
+            predicted_ratings, _, _, _ = matrix_factorization(ratings_matrix, users, movies_with_ratings)
+            user_index = users.index(user_id) if user_id in users else -1
+            
+            if user_index != -1:
+                user_predicted_ratings = predicted_ratings[user_index]
+                movie_ratings = []
+                for idx, movie_id in enumerate(movies_with_ratings):
+                    movie = movies_queryset.filter(id=movie_id).first()
+                    if movie and not Rating.objects.filter(user_id=user_id, movie_id=movie_id).exists():
+                        entities = skg._extract_movie_entities(movie)
+                        pref_boost = sum(user_prefs.get(entity, 0) for entity in entities) / (len(entities) or 1)
+                        boosted_score = user_predicted_ratings[idx] * (1 + 0.2 * pref_boost)
+                        movie_ratings.append((movie, boosted_score))
+                
+                movie_ratings.sort(key=lambda x: x[1], reverse=True)
+                additional_recommendations = [movie for movie, _ in movie_ratings[:num_recommendations - len(recommendations)]]
+                recommendations.extend(additional_recommendations)
+
+    # Step 4: Fall back to popular movies if still not enough
+    if len(recommendations) < num_recommendations:
+        popular_movies = movies_queryset.order_by('-rating', '-no_of_votes').exclude(
+            id__in=[m.id for m in recommendations]
+        )[:num_recommendations - len(recommendations)]
+        recommendations.extend(popular_movies)
+
+    redis_client.setex(redis_key, 3600, pickle.dumps(recommendations))
+    logger.info(f"Recommendations: {[m.series_title for m in recommendations]}")
     return recommendations
 
-def get_search_based_suggestions(user_id, movies_queryset, num_suggestions=5):
+def get_search_based_suggestions(user_id, session_id, movies_queryset, num_suggestions=5):
     """Generate search-based movie suggestions."""
-    frequent_searches = SearchHistory.objects.filter(user_id=user_id).values('query').annotate(
-        count=Count('query')).order_by('-count')[:3]
-    logger.debug(f"Frequent searches for user {user_id}: {[s['query'] for s in frequent_searches]}")
+    if user_id:
+        frequent_searches = SearchHistory.objects.filter(user_id=user_id).values('query').annotate(
+            count=Count('query')).order_by('-count')[:3]
+    else:
+        frequent_searches = SearchHistory.objects.filter(session_id=session_id).values('query').annotate(
+            count=Count('query')).order_by('-count')[:3]
+    
+    logger.debug(f"Frequent searches for suggestions: {[s['query'] for s in frequent_searches]}")
     
     suggestions = []
     for search in frequent_searches:
@@ -121,7 +194,7 @@ def get_search_based_suggestions(user_id, movies_queryset, num_suggestions=5):
             Q(star1__icontains=query) |
             Q(star2__icontains=query)
         ).exclude(
-            id__in=Rating.objects.filter(user_id=user_id).values('movie_id')
+            id__in=Rating.objects.filter(user_id=user_id).values('movie_id') if user_id else []
         )[:num_suggestions]
         suggestions.extend(matches)
     
@@ -229,7 +302,7 @@ def home(request):
     
     search_type = request.GET.get('search_type', 'keyword')
     query = request.GET.get('q', '').strip()
-    sort_by = request.GET.get('sort', 'rating')  # rating, year, title
+    sort_by = request.GET.get('sort', 'rating')
     page_number = request.GET.get('page', 1)
     
     all_movies = Movie.objects.all()
@@ -275,7 +348,7 @@ def home(request):
                 movies = [
                     {
                         'movie': result['movie'],
-                        'similarity': min(100, result['score'] * 100),  # Normalize to 0-100%
+                        'similarity': min(100, result['score'] * 100),
                         'explanations': skg.get_recommendation_explanation(query, expanded_terms, result['movie'])
                     }
                     for result in search_results
@@ -310,33 +383,10 @@ def home(request):
     paginator = Paginator(movies, 12)
     movies = paginator.get_page(page_number)
 
-    if request.user.is_authenticated:
-        users = list(set(Rating.objects.values_list('user_id', flat=True)))
-        movies_with_ratings = list(set(Rating.objects.values_list('movie_id', flat=True)))
-        logger.debug(f"Users found: {len(users)}, Movies rated: {len(movies_with_ratings)}")
-        
-        if users and movies_with_ratings:
-            ratings_matrix = np.zeros((len(users), len(movies_with_ratings)))
-            for rating in Rating.objects.all():
-                user_idx = users.index(rating.user_id)
-                movie_idx = movies_with_ratings.index(rating.movie_id)
-                ratings_matrix[user_idx, movie_idx] = rating.rating
-            logger.debug(f"Ratings matrix created: {ratings_matrix.shape}")
-            
-            recommendations = get_recommendations(
-                user_id=request.user.id,
-                ratings_matrix=ratings_matrix,
-                user_ids=users,
-                movie_ids=movies_with_ratings,
-                movies_queryset=all_movies,
-                num_recommendations=8
-            )
-        
-        search_suggestions = get_search_based_suggestions(
-            user_id=request.user.id,
-            movies_queryset=all_movies,
-            num_suggestions=5
-        )
+    user_id = request.user.id if request.user.is_authenticated else None
+    session_id = get_or_create_session_id(request)
+    recommendations = get_recommendations(request, all_movies, num_recommendations=5)
+    search_suggestions = get_search_based_suggestions(user_id, session_id, all_movies, num_suggestions=5)
 
     logger.debug(f"Recommendations: {[m.series_title for m in recommendations]}")
     logger.debug(f"Search suggestions: {[m.series_title for m in search_suggestions]}")
@@ -348,6 +398,7 @@ def home(request):
         'sort_by': sort_by,
         'show_similarity': show_similarity,
         'user_authenticated': request.user.is_authenticated,
+        'user': request.user,
         'recommendations': recommendations,
         'search_suggestions': search_suggestions,
         'results_count': results_count,
@@ -549,40 +600,17 @@ def search_view(request):
         'avg_rating': Movie.objects.aggregate(avg=Avg('rating'))['avg'] or 0,
         'recent_movies': Movie.objects.filter(released_year__gte=timezone.now().year - 5).count(),
         'total_ratings': Rating.objects.count(),
-        'top_genres': Movie.objects.values('genre').annotate(count=Count('genre')).order_by('-count')[:1]
+        'top_genres': Movie.objects.values('genre').annotate(count=Count('genre')).order_by('-count')[:5]
     }
 
     skg = SemanticKnowledgeGraph()
     trending_data = skg.get_trending_concepts(days=7, limit=5)
     trending_concepts = [item['concept'] for item in trending_data]
 
-    if user and not is_guest:
-        preferred_entities = skg.user_preferences.get(user.id, {})
-        if preferred_entities:
-            top_entities = sorted(preferred_entities.items(), key=lambda x: x[1], reverse=True)[:3]
-            entity_filters = Q()
-            for entity, _ in top_entities:
-                entity_filters |= (
-                    Q(genre__icontains=entity) |
-                    Q(director__icontains=entity) |
-                    Q(star1__icontains=entity) |
-                    Q(star2__icontains=entity) |
-                    Q(star3__icontains=entity) |
-                    Q(star4__icontains=entity)
-                )
-            recommendations = Movie.objects.filter(entity_filters).order_by('-rating')[:4]
-        else:
-            recommendations = Movie.objects.order_by('-rating')[:4]
-
-    if not query:
-        if user and not is_guest:
-            recent_searches = SearchHistory.objects.filter(user=user).order_by('-timestamp')[:5]
-            movie_ids = Movie.objects.filter(
-                series_title__in=[s.query for s in recent_searches]
-            ).values_list('id', flat=True)
-            search_suggestions = Movie.objects.filter(id__in=movie_ids)[:5]
-        else:
-            search_suggestions = Movie.objects.order_by('-no_of_votes')[:5]
+    user_id = user.id if user else None
+    session_id = get_or_create_session_id(request)
+    recommendations = get_recommendations(request, Movie.objects.all(), num_recommendations=5)
+    search_suggestions = get_search_based_suggestions(user_id, session_id, Movie.objects.all(), num_suggestions=5)
 
     context = {
         'query': query,
@@ -596,6 +624,7 @@ def search_view(request):
         'recommendations': recommendations,
         'search_suggestions': search_suggestions,
         'user_authenticated': user and not is_guest,
+        'user': user,
         'is_guest': is_guest,
         'is_staff': is_staff,
         'messages': []

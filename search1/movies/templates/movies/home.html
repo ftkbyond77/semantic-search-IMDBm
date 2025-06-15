@@ -27,8 +27,9 @@
             background: linear-gradient(145deg, #f1f5f9, #e2e8f0);
             border-left: 4px solid #3b82f6;
         }
-        .recommendation-card {
-            background: linear-gradient(145deg, #fef3c7, #fbbf24);
+        .recommendation-box {
+            background: linear-gradient(145deg, #fef3c7, #fefce8);
+            border-left: 4px solid #f59e0b;
         }
         .trending-badge {
             background: linear-gradient(45deg, #ff6b6b, #feca57);
@@ -85,6 +86,9 @@
                 <div class="flex items-center space-x-4">
                     {% if user_authenticated %}
                         <span class="text-white text-sm">Welcome, {{ user.username }}!</span>
+                        <a href="{% url 'movies:profile' %}" class="text-white hover:text-yellow-300 transition-colors">
+                            <i class="fas fa-user mr-1"></i>Profile
+                        </a>
                         {% if is_staff %}
                             <a href="{% url 'movies:search_analytics' %}" class="text-white hover:text-yellow-300 transition-colors">
                                 <i class="fas fa-chart-bar mr-1"></i>Analytics
@@ -94,361 +98,361 @@
                             <i class="fas fa-sign-out-alt mr-1"></i>Logout
                         </a>
                     {% else %}
-                        {% if not is_guest %}
-                            <a href="{% url 'movies:auth' %}" class="bg-white text-blue-600 px-4 py-2 rounded-lg font-medium hover:bg-gray-100 transition-colors">
-                                Login
-                            </a>
-                        {% endif %}
+                        <a href="{% url 'movies:home' %}?guest=true" class="text-white hover:text-yellow-300 transition-colors">
+                            <i class="fas fa-user-circle mr-1"></i>Guest Mode
+                        </a>
+                        <a href="{% url 'movies:auth' %}" class="bg-white text-blue-600 px-4 py-2 rounded-lg font-medium hover:bg-gray-100 transition-colors">
+                            Login/Sign Up
+                        </a>
                     {% endif %}
                 </div>
             </div>
         </div>
     </nav>
 
-    <!-- Hero Section with Search -->
-    <div class="gradient-bg py-16">
-        <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-            <h2 class="text-4xl md:text-6xl font-bold text-white mb-4">
-                Discover Amazing Movies
-            </h2>
-            <p class="text-xl text-white opacity-90 mb-8">
-                Search through thousands of movies using advanced AI-powered semantic search
-            </p>
-            
-            <!-- Search Form -->
-            <form method="GET" class="search-container p-6 rounded-2xl max-w-2xl mx-auto">
-                <div class="flex flex-col md:flex-row gap-4">
-                    <div class="flex-1">
-                        <input 
-                            type="text" 
-                            name="q" 
-                            value="{{ query }}" 
-                            placeholder="Search for movies, actors, directors, genres..."
-                            class="w-full px-4 py-3 rounded-lg text-gray-800 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-400"
-                            id="searchInput"
-                        >
+    <!-- Main Container -->
+    <div class="flex max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 gap-8">
+        <!-- Main Content -->
+        <div class="flex-1">
+            <!-- Hero Section with Search -->
+            <div class="gradient-bg py-16 rounded-2xl mb-8">
+                <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+                    <h2 class="text-4xl md:text-5xl font-bold text-white mb-4 fade-in">
+                        Discover Amazing Movies
+                    </h2>
+                    <p class="text-lg text-white opacity-90 mb-8">
+                        Search thousands of movies with AI-powered semantic search
+                    </p>
+                    
+                    <!-- Search Form -->
+                    <form method="GET" class="search-container p-6 rounded-2xl max-w-2xl mx-auto">
+                        <div class="flex flex-col md:flex-row gap-4">
+                            <div class="flex-1">
+                                <input 
+                                    type="text" 
+                                    name="q" 
+                                    value="{{ query }}" 
+                                    placeholder="Search movies, actors, directors, genres..."
+                                    class="w-full px-4 py-3 rounded-lg text-gray-800 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                                    id="searchInput"
+                                >
+                            </div>
+                            <div class="flex gap-2">
+                                <select name="search_type" class="px-4 py-3 rounded-lg text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-400">
+                                    <option value="keyword" {% if search_type == 'keyword' %}selected{% endif %}>Keyword Search</option>
+                                    <option value="semantic" {% if search_type == 'semantic' %}selected{% endif %}>AI Semantic Search</option>
+                                </select>
+                                {% if query and search_type == 'keyword' %}
+                                    <select name="sort" class="px-4 py-3 rounded-lg text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-400">
+                                        <option value="rating" {% if sort_by == 'rating' %}selected{% endif %}>By Rating</option>
+                                        <option value="year" {% if sort_by == 'year' %}selected{% endif %}>By Year</option>
+                                        <option value="title" {% if sort_by == 'title' %}selected{% endif %}>By Title</option>
+                                    </select>
+                                {% endif %}
+                                {% if is_guest %}
+                                    <input type="hidden" name="guest" value="true">
+                                {% endif %}
+                                <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium transition-colors flex items-center">
+                                    <i class="fas fa-search mr-2"></i>Search
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+
+                    <!-- Search Suggestions -->
+                    {% if search_suggestions %}
+                        <div class="mt-6">
+                            <p class="text-white text-sm mb-3">Based on your search history:</p>
+                            <div class="flex flex-wrap justify-center gap-2">
+                                {% for suggestion in search_suggestions %}
+                                    <a href="{% url 'movies:movie_detail' suggestion.id %}" 
+                                       class="search-suggestion px-4 py-2 bg-white bg-opacity-20 text-white rounded-full text-sm hover:bg-opacity-30 transition-all">
+                                        {{ suggestion.series_title }}
+                                    </a>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Statistics Section -->
+            {% if movie_stats %}
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
+                    <div class="stat-card p-4 rounded-lg fade-in">
+                        <div class="flex items-center">
+                            <i class="fas fa-film text-blue-600 text-2xl mr-3"></i>
+                            <div>
+                                <p class="text-sm text-gray-600">Total Movies</p>
+                                <p class="text-xl font-bold">{{ movie_stats.total_movies|floatformat:0 }}</p>
+                            </div>
+                        </div>
                     </div>
-                    <div class="flex gap-2">
-                        <select name="search_type" class="px-4 py-3 rounded-lg text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-400">
-                            <option value="keyword" {% if search_type == 'keyword' %}selected{% endif %}>Keyword Search</option>
-                            <option value="semantic" {% if search_type == 'semantic' %}selected{% endif %}>AI Semantic Search</option>
-                        </select>
-                        {% if query and search_type == 'keyword' %}
-                            <select name="sort" class="px-4 py-3 rounded-lg text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-400">
-                                <option value="rating" {% if sort_by == 'rating' %}selected{% endif %}>By Rating</option>
-                                <option value="year" {% if sort_by == 'year' %}selected{% endif %}>By Year</option>
-                                <option value="title" {% if sort_by == 'title' %}selected{% endif %}>By Title</option>
-                            </select>
-                        {% endif %}
-                        <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium transition-colors flex items-center">
-                            <i class="fas fa-search mr-2"></i>Search
-                        </button>
+                    <div class="stat-card p-4 rounded-lg fade-in">
+                        <div class="flex items-center">
+                            <i class="fas fa-star text-yellow-500 text-2xl mr-3"></i>
+                            <div>
+                                <p class="text-sm text-gray-600">Avg Rating</p>
+                                <p class="text-xl font-bold">{{ movie_stats.avg_rating|floatformat:1 }}</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="stat-card p-4 rounded-lg fade-in">
+                        <div class="flex items-center">
+                            <i class="fas fa-calendar text-green-600 text-2xl mr-3"></i>
+                            <div>
+                                <p class="text-sm text-gray-600">Recent Movies</p>
+                                <p class="text-xl font-bold">{{ movie_stats.recent_movies }}</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="stat-card p-4 rounded-lg fade-in">
+                        <div class="flex items-center">
+                            <i class="fas fa-heart text-red-500 text-2xl mr-3"></i>
+                            <div>
+                                <p class="text-sm text-gray-600">Total Ratings</p>
+                                <p class="text-xl font-bold">{{ movie_stats.total_ratings|floatformat:0 }}</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="stat-card p-4 rounded-lg fade-in">
+                        <div class="flex items-center">
+                            <i class="fas fa-fire text-orange-500 text-2xl mr-3"></i>
+                            <div>
+                                <p class="text-sm text-gray-600">Top Genre</p>
+                                <p class="text-lg font-bold">{{ movie_stats.top_genres.0.genre|truncatechars:10 }}</p>
+                            </div>
+                        </div>
                     </div>
                 </div>
-            </form>
+            {% endif %}
 
-            <!-- Search Suggestions -->
-            {% if search_suggestions %}
-                <div class="mt-6">
-                    <p class="text-white text-sm mb-3">Based on your search history:</p>
-                    <div class="flex flex-wrap justify-center gap-2">
-                        {% for suggestion in search_suggestions %}
-                            <a href="{% url 'movies:movie_detail' suggestion.id %}" 
-                               class="search-suggestion px-4 py-2 bg-white bg-opacity-20 text-white rounded-full text-sm hover:bg-opacity-30 transition-all">
-                                {{ suggestion.series_title }}
-                            </a>
+            <!-- Trending Concepts -->
+            {% if trending_concepts %}
+                <div class="mb-8">
+                    <h3 class="text-2xl font-bold text-gray-800 mb-4 flex items-center fade-in">
+                        <i class="fas fa-trending-up mr-2 text-orange-500"></i>
+                        Trending Now
+                    </h3>
+                    <div class="flex flex-wrap gap-2">
+                        {% for concept in trending_concepts %}
+                            <span class="trending-badge px-4 py-2 rounded-full text-white font-medium text-sm">
+                                {{ concept }}
+                            </span>
                         {% endfor %}
                     </div>
                 </div>
             {% endif %}
-        </div>
-    </div>
 
-    <!-- Main Content -->
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        
-        <!-- Statistics Section -->
-        {% if movie_stats %}
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
-                <div class="stat-card p-4 rounded-lg">
-                    <div class="flex items-center">
-                        <i class="fas fa-film text-blue-600 text-2xl mr-3"></i>
-                        <div>
-                            <p class="text-sm text-gray-600">Total Movies</p>
-                            <p class="text-xl font-bold">{{ movie_stats.total_movies|floatformat:0 }}</p>
-                        </div>
-                    </div>
+            <!-- Search Results Header -->
+            {% if query %}
+                <div class="mb-6">
+                    <h2 class="text-3xl font-bold text-gray-800 mb-2 fade-in">
+                        {% if search_type == 'semantic' %}
+                            <i class="fas fa-brain mr-2 text-purple-600"></i>AI Search Results
+                        {% else %}
+                            <i class="fas fa-search mr-2 text-blue-600"></i>Search Results
+                        {% endif %}
+                    </h2>
+                    <p class="text-gray-600">
+                        Found {{ results_count }} movies for "{{ query }}"
+                        {% if search_type == 'semantic' %}
+                            using AI semantic search
+                        {% endif %}
+                    </p>
                 </div>
-                <div class="stat-card p-4 rounded-lg">
-                    <div class="flex items-center">
-                        <i class="fas fa-star text-yellow-500 text-2xl mr-3"></i>
-                        <div>
-                            <p class="text-sm text-gray-600">Avg Rating</p>
-                            <p class="text-xl font-bold">{{ movie_stats.avg_rating|floatformat:1 }}</p>
-                        </div>
-                    </div>
+            {% else %}
+                <div class="mb-6">
+                    <h2 class="text-3xl font-bold text-gray-800 mb-2 fade-in">
+                        <i class="fas fa-trophy mr-2 text-yellow-500"></i>Popular Movies
+                    </h2>
+                    <p class="text-gray-600">Discover the highest-rated and most popular movies</p>
                 </div>
-                <div class="stat-card p-4 rounded-lg">
-                    <div class="flex items-center">
-                        <i class="fas fa-calendar text-green-600 text-2xl mr-3"></i>
-                        <div>
-                            <p class="text-sm text-gray-600">Recent Movies</p>
-                            <p class="text-xl font-bold">{{ movie_stats.recent_movies }}</p>
-                        </div>
-                    </div>
-                </div>
-                <div class="stat-card p-4 rounded-lg">
-                    <div class="flex items-center">
-                        <i class="fas fa-heart text-red-500 text-2xl mr-3"></i>
-                        <div>
-                            <p class="text-sm text-gray-600">Total Ratings</p>
-                            <p class="text-xl font-bold">{{ movie_stats.total_ratings|floatformat:0 }}</p>
-                        </div>
-                    </div>
-                </div>
-                <div class="stat-card p-4 rounded-lg">
-                    <div class="flex items-center">
-                        <i class="fas fa-fire text-orange-500 text-2xl mr-3"></i>
-                        <div>
-                            <p class="text-sm text-gray-600">Top Genre</p>
-                            <p class="text-lg font-bold">{{ movie_stats.top_genres.0.genre|truncatechars:10 }}</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        {% endif %}
+            {% endif %}
 
-        <!-- Trending Concepts -->
-        {% if trending_concepts %}
-            <div class="mb-8">
-                <h3 class="text-2xl font-bold text-gray-800 mb-4 flex items-center">
-                    <i class="fas fa-trending-up mr-2 text-orange-500"></i>
-                    Trending Now
-                </h3>
-                <div class="flex flex-wrap gap-2">
-                    {% for concept in trending_concepts %}
-                        <span class="trending-badge px-4 py-2 rounded-full text-white font-medium text-sm">
-                            {{ concept }}
-                        </span>
-                    {% endfor %}
-                </div>
-            </div>
-        {% endif %}
-
-        <!-- Search Results Header -->
-        {% if query %}
-            <div class="mb-6">
-                <h2 class="text-3xl font-bold text-gray-800 mb-2">
-                    {% if search_type == 'semantic' %}
-                        <i class="fas fa-brain mr-2 text-purple-600"></i>AI Search Results
-                    {% else %}
-                        <i class="fas fa-search mr-2 text-blue-600"></i>Search Results
-                    {% endif %}
-                </h2>
-                <p class="text-gray-600">
-                    Found {{ results_count }} movies for "{{ query }}"
-                    {% if search_type == 'semantic' %}
-                        using AI semantic search
-                    {% endif %}
-                </p>
-            </div>
-        {% else %}
-            <div class="mb-6">
-                <h2 class="text-3xl font-bold text-gray-800 mb-2">
-                    <i class="fas fa-trophy mr-2 text-yellow-500"></i>Popular Movies
-                </h2>
-                <p class="text-gray-600">Discover the highest-rated and most popular movies</p>
-            </div>
-        {% endif %}
-
-        <!-- Recommendations Section -->
-        {% if recommendations and user_authenticated %}
-            <div class="mb-8">
-                <h3 class="text-2xl font-bold text-gray-800 mb-4 flex items-center">
-                    <i class="fas fa-magic mr-2 text-purple-600"></i>
-                    Recommended for You
-                </h3>
-                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                    {% for movie in recommendations %}
-                        <div class="recommendation-card rounded-lg overflow-hidden shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-2">
-                            <div class="aspect-w-2 aspect-h-3 bg-gray-200">
-                                {% if movie.poster_link %}
-                                    <img src="{{ movie.poster_link }}" alt="{{ movie.series_title }}" 
-                                         class="w-full h-48 object-cover" 
-                                         onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 200 300%22><rect width=%22200%22 height=%22300%22 fill=%22%23e5e7eb%22/><text x=%22100%22 y=%22150%22 text-anchor=%22middle%22 fill=%22%23374151%22 font-size=%2216%22>No Image</text></svg>'">
-                                {% else %}
-                                    <div class="w-full h-48 bg-gray-300 flex items-center justify-center">
-                                        <i class="fas fa-film text-4xl text-gray-500"></i>
+            <!-- Movies Grid -->
+            <div class="fade-in">
+                {% if movies %}
+                    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8">
+                        {% if show_similarity %}
+                            {% for item in movies %}
+                                <div class="movie-card rounded-lg overflow-hidden shadow-lg">
+                                    <div class="aspect-w-2 aspect-h-3 bg-gray-200 relative">
+                                        {% if item.movie.poster_link %}
+                                            <img src="{{ item.movie.poster_link }}" alt="{{ item.movie.series_title }}" 
+                                                 class="w-full h-48 object-cover" 
+                                                 onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 200 300%22><rect width=%22200%22 height=%22300%22 fill=%22%23e5e7eb%22/><text x=%22100%22 y=%22150%22 text-anchor=%22middle%22 fill=%22%23374151%22 font-size=%2216%22>No Image</text></svg>'">
+                                        {% else %}
+                                            <div class="w-full h-48 bg-gray-300 flex items-center justify-center">
+                                                <i class="fas fa-film text-4xl text-gray-500"></i>
+                                            </div>
+                                        {% endif %}
+                                        <!-- Semantic Similarity Badge -->
+                                        <div class="absolute top-2 right-2 bg-gradient-to-r from-purple-500 to-blue-500 text-white px-2 py-1 rounded-full text-xs font-bold">
+                                            {{ item.similarity }}% match
+                                        </div>
                                     </div>
+                                    <div class="p-4">
+                                        <h3 class="font-bold text-lg text-gray-800 mb-2 line-clamp-2">{{ item.movie.series_title }}</h3>
+                                        <div class="flex items-center justify-between mb-2">
+                                            <div class="star-rating">
+                                                {% for i in "12345" %}
+                                                    {% if item.movie.rating >= i|add:0 %}
+                                                        <i class="fas fa-star"></i>
+                                                    {% else %}
+                                                        <i class="far fa-star"></i>
+                                                    {% endif %}
+                                                {% endfor %}
+                                            </div>
+                                            <span class="text-sm text-gray-600">{{ item.movie.rating }}</span>
+                                        </div>
+                                        <p class="text-sm text-gray-600 mb-2">{{ item.movie.released_year }} • {{ item.movie.genre|truncatechars:20 }}</p>
+                                        {% if item.explanations %}
+                                            <ul class="text-xs text-gray-500 mb-3 list-disc pl-4">
+                                                {% for explanation in item.explanations %}
+                                                    <li>{{ explanation }}</li>
+                                                {% endfor %}
+                                            </ul>
+                                        {% endif %}
+                                        <!-- Similarity Bar -->
+                                        <div class="mb-3">
+                                            <div class="bg-gray-200 rounded-full h-2">
+                                                <div class="similarity-bar h-2 rounded-full" style="width: {{ item.similarity }}%"></div>
+                                            </div>
+                                        </div>
+                                        <a href="{% url 'movies:movie_detail' item.movie.id %}" 
+                                           class="block w-full bg-blue-600 hover:bg-blue-700 text-white text-center py-2 rounded-lg font-medium transition-colors">
+                                            View Details
+                                        </a>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        {% else %}
+                            {% for movie in movies %}
+                                <div class="movie-card rounded-lg overflow-hidden shadow-lg">
+                                    <div class="aspect-w-2 aspect-h-3 bg-gray-200">
+                                        {% if movie.poster_link %}
+                                            <img src="{{ movie.poster_link }}" alt="{{ movie.series_title }}" 
+                                                 class="w-full h-48 object-cover" 
+                                                 onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 200 300%22><rect width=%22200%22 height=%22300%22 fill=%22%23e5e7eb%22/><text x=%22100%22 y=%22150%22 text-anchor=%22middle%22 fill=%22%23374151%22 font-size=%2216%22>No Image</text></svg>'">
+                                        {% else %}
+                                            <div class="w-full h-48 bg-gray-300 flex items-center justify-center">
+                                                <i class="fas fa-film text-4xl text-gray-500"></i>
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                    <div class="p-4">
+                                        <h3 class="font-bold text-lg text-gray-800 mb-2 line-clamp-2">{{ movie.series_title }}</h3>
+                                        <div class="flex items-center justify-between mb-2">
+                                            <div class="star-rating">
+                                                {% for i in "12345" %}
+                                                    {% if movie.rating >= i|add:0 %}
+                                                        <i class="fas fa-star"></i>
+                                                    {% else %}
+                                                        <i class="far fa-star"></i>
+                                                    {% endif %}
+                                                {% endfor %}
+                                            </div>
+                                            <span class="text-sm text-gray-600">{{ movie.rating }}</span>
+                                        </div>
+                                        <p class="text-sm text-gray-600 mb-3">{{ movie.released_year }} • {{ movie.genre|truncatechars:20 }}</p>
+                                        <a href="{% url 'movies:movie_detail' movie.id %}" 
+                                           class="block w-full bg-blue-600 hover:bg-blue-700 text-white text-center py-2 rounded-lg font-medium transition-colors">
+                                            View Details
+                                        </a>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        {% endif %}
+                    </div>
+
+                    <!-- Pagination -->
+                    {% if movies.has_other_pages %}
+                        <div class="flex justify-center mt-8">
+                            <nav class="flex items-center space-x-1">
+                                {% if movies.has_previous %}
+                                    <a href="?{% if query %}q={{ query }}&{% endif %}{% if search_type %}search_type={{ search_type }}&{% endif %}{% if sort_by %}sort={{ sort_by }}&{% endif %}{% if is_guest %}guest=true&{% endif %}page={{ movies.previous_page_number }}" 
+                                       class="px-3 py-2 rounded-lg bg-white text-gray-700 hover:bg-gray-100 transition-colors">
+                                        <i class="fas fa-chevron-left"></i>
+                                    </a>
                                 {% endif %}
-                            </div>
-                            <div class="p-4">
-                                <h4 class="font-bold text-gray-800 mb-2 line-clamp-2">{{ movie.series_title }}</h4>
-                                <div class="flex items-center text-sm text-gray-600 mb-2">
+                                {% for num in movies.paginator.page_range %}
+                                    {% if movies.number == num %}
+                                        <span class="px-3 py-2 rounded-lg bg-blue-600 text-white">{{ num }}</span>
+                                    {% elif num >= movies.number|add:'-2' and num <= movies.number|add:'2' %}
+                                        <a href="?{% if query %}q={{ query }}&{% endif %}{% if search_type %}search_type={{ search_type }}&{% endif %}{% if sort_by %}sort={{ sort_by }}&{% endif %}{% if is_guest %}guest=true&{% endif %}page={{ num }}" 
+                                           class="px-3 py-2 rounded-lg bg-white text-gray-700 hover:bg-gray-100 transition-colors">
+                                            {{ num }}
+                                        </a>
+                                    {% elif num == 1 or num == movies.paginator.num_pages %}
+                                        <a href="?{% if query %}q={{ query }}&{% endif %}{% if search_type %}search_type={{ search_type }}&{% endif %}{% if sort_by %}sort={{ sort_by }}&{% endif %}{% if is_guest %}guest=true&{% endif %}page={{ num }}" 
+                                           class="px-3 py-2 rounded-lg bg-white text-gray-700 hover:bg-gray-100 transition-colors">
+                                            {{ num }}
+                                        </a>
+                                    {% elif num == movies.number|add:'-3' or num == movies.number|add:'3' %}
+                                        <span class="px-3 py-2 text-gray-700">...</span>
+                                    {% endif %}
+                                {% endfor %}
+                                {% if movies.has_next %}
+                                    <a href="?{% if query %}q={{ query }}&{% endif %}{% if search_type %}search_type={{ search_type }}&{% endif %}{% if sort_by %}sort={{ sort_by }}&{% endif %}{% if is_guest %}guest=true&{% endif %}page={{ movies.next_page_number }}" 
+                                       class="px-3 py-2 rounded-lg bg-white text-gray-700 hover:bg-gray-100 transition-colors">
+                                        <i class="fas fa-chevron-right"></i>
+                                    </a>
+                                {% endif %}
+                            </nav>
+                        </div>
+                    {% endif %}
+                {% else %}
+                    <div class="text-center py-16">
+                        <i class="fas fa-search text-6xl text-gray-400 mb-4"></i>
+                        <h3 class="text-2xl font-bold text-gray-600 mb-2">No Movies Found</h3>
+                        <p class="text-gray-500">
+                            {% if query %}
+                                Try adjusting your search terms or switch between keyword and semantic search.
+                            {% else %}
+                                Start by searching for movies, actors, or genres above.
+                            {% endif %}
+                        </p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Sidebar -->
+        <div class="w-80 hidden lg:block">
+            <div class="sticky top-8">
+                <!-- Recommendation Box -->
+                {% if recommendations %}
+                    <div class="recommendation-box p-4 rounded-lg shadow-lg mb-6 fade-in">
+                        <h3 class="text-lg font-bold text-gray-800 mb-4 flex items-center">
+                            <i class="fas fa-magic mr-2 text-amber-600"></i>
+                            Recommended for You
+                        </h3>
+                        {% for movie in recommendations %}
+                            <div class="mb-4 last:mb-0">
+                                <a href="{% url 'movies:movie_detail' movie.id %}" 
+                                   class="text-sm font-medium text-gray-800 hover:text-blue-600 transition-colors line-clamp-2">
+                                    {{ movie.series_title }}
+                                </a>
+                                <div class="flex items-center text-xs text-gray-600 mt-1">
                                     <div class="star-rating mr-2">
                                         {% for i in "12345" %}
                                             {% if movie.rating >= i|add:0 %}
-                                                <i class="fas fa-star"></i>
+                                                <i class="fas fa-star text-amber-400"></i>
                                             {% else %}
-                                                <i class="far fa-star"></i>
+                                                <i class="far fa-star text-amber-400"></i>
                                             {% endif %}
                                         {% endfor %}
                                     </div>
                                     <span>{{ movie.rating }}</span>
                                 </div>
-                                <a href="{% url 'movies:movie_detail' movie.id %}" 
-                                   class="block w-full bg-white text-purple-600 text-center py-2 rounded-lg font-medium hover:bg-purple-50 transition-colors">
-                                    View Details
-                                </a>
                             </div>
-                        </div>
-                    {% endfor %}
-                </div>
-            </div>
-        {% endif %}
-
-        <!-- Movies Grid -->
-        <div class="fade-in">
-            {% if movies %}
-                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8">
-                    {% if show_similarity %}
-                        {% for item in movies %}
-                            <div class="movie-card rounded-lg overflow-hidden shadow-lg">
-                                <div class="aspect-w-2 aspect-h-3 bg-gray-200 relative">
-                                    {% if item.movie.poster_link %}
-                                        <img src="{{ item.movie.poster_link }}" alt="{{ item.movie.series_title }}" 
-                                             class="w-full h-48 object-cover" 
-                                             onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 200 300%22><rect width=%22200%22 height=%22300%22 fill=%22%23e5e7eb%22/><text x=%22100%22 y=%22150%22 text-anchor=%22middle%22 fill=%22%23374151%22 font-size=%2216%22>No Image</text></svg>'">
-                                    {% else %}
-                                        <div class="w-full h-48 bg-gray-300 flex items-center justify-center">
-                                            <i class="fas fa-film text-4xl text-gray-500"></i>
-                                        </div>
-                                    {% endif %}
-                                    <!-- Semantic Similarity Badge -->
-                                    <div class="absolute top-2 right-2 bg-gradient-to-r from-purple-500 to-blue-500 text-white px-2 py-1 rounded-full text-xs font-bold">
-                                        {{ item.similarity }}% match
-                                    </div>
-                                </div>
-                                <div class="p-4">
-                                    <h3 class="font-bold text-lg text-gray-800 mb-2 line-clamp-2">{{ item.movie.series_title }}</h3>
-                                    <div class="flex items-center justify-between mb-2">
-                                        <div class="star-rating">
-                                            {% for i in "12345" %}
-                                                {% if item.movie.rating >= i|add:0 %}
-                                                    <i class="fas fa-star"></i>
-                                                {% else %}
-                                                    <i class="far fa-star"></i>
-                                                {% endif %}
-                                            {% endfor %}
-                                        </div>
-                                        <span class="text-sm text-gray-600">{{ item.movie.rating }}</span>
-                                    </div>
-                                    <p class="text-sm text-gray-600 mb-2">{{ item.movie.released_year }} • {{ item.movie.genre|truncatechars:20 }}</p>
-                                    
-                                    <!-- Similarity Bar -->
-                                    <div class="mb-3">
-                                        <div class="bg-gray-200 rounded-full h-2">
-                                            <div class="similarity-bar h-2 rounded-full" style="width: {{ item.similarity }}%"></div>
-                                        </div>
-                                    </div>
-                                    
-                                    <a href="{% url 'movies:movie_detail' item.movie.id %}" 
-                                       class="block w-full bg-blue-600 hover:bg-blue-700 text-white text-center py-2 rounded-lg font-medium transition-colors">
-                                        View Details
-                                    </a>
-                                </div>
-                            </div>
+                        {% empty %}
+                            <p class="text-sm text-gray-600">No recommendations yet.</p>
                         {% endfor %}
-                    {% else %}
-                        {% for movie in movies %}
-                            <div class="movie-card rounded-lg overflow-hidden shadow-lg">
-                                <div class="aspect-w-2 aspect-h-3 bg-gray-200">
-                                    {% if movie.poster_link %}
-                                        <img src="{{ movie.poster_link }}" alt="{{ movie.series_title }}" 
-                                             class="w-full h-48 object-cover" 
-                                             onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 200 300%22><rect width=%22200%22 height=%22300%22 fill=%22%23e5e7eb%22/><text x=%22100%22 y=%22150%22 text-anchor=%22middle%22 fill=%22%23374151%22 font-size=%2216%22>No Image</text></svg>'">
-                                    {% else %}
-                                        <div class="w-full h-48 bg-gray-300 flex items-center justify-center">
-                                            <i class="fas fa-film text-4xl text-gray-500"></i>
-                                        </div>
-                                    {% endif %}
-                                </div>
-                                <div class="p-4">
-                                    <h3 class="font-bold text-lg text-gray-800 mb-2 line-clamp-2">{{ movie.series_title }}</h3>
-                                    <div class="flex items-center justify-between mb-2">
-                                        <div class="star-rating">
-                                            {% for i in "12345" %}
-                                                {% if movie.rating >= i|add:0 %}
-                                                    <i class="fas fa-star"></i>
-                                                {% else %}
-                                                    <i class="far fa-star"></i>
-                                                {% endif %}
-                                            {% endfor %}
-                                        </div>
-                                        <span class="text-sm text-gray-600">{{ movie.rating }}</span>
-                                    </div>
-                                    <p class="text-sm text-gray-600 mb-3">{{ movie.released_year }} • {{ movie.genre|truncatechars:20 }}</p>
-                                    <a href="{% url 'movies:movie_detail' movie.id %}" 
-                                       class="block w-full bg-blue-600 hover:bg-blue-700 text-white text-center py-2 rounded-lg font-medium transition-colors">
-                                        View Details
-                                    </a>
-                                </div>
-                            </div>
-                        {% endfor %}
-                    {% endif %}
-                </div>
-
-                <!-- Pagination -->
-                {% if movies.has_other_pages %}
-                    <div class="flex justify-center mt-8">
-                        <nav class="flex items-center space-x-1">
-                            {% if movies.has_previous %}
-                                <a href="?{% if query %}q={{ query }}&{% endif %}{% if search_type %}search_type={{ search_type }}&{% endif %}{% if sort_by %}sort={{ sort_by }}&{% endif %}page={{ movies.previous_page_number }}" 
-                                   class="px-3 py-2 rounded-lg bg-white text-gray-700 hover:bg-gray-100 transition-colors">
-                                    <i class="fas fa-chevron-left"></i>
-                                </a>
-                            {% endif %}
-                            
-                            {% for num in movies.paginator.page_range %}
-                                {% if movies.number == num %}
-                                    <span class="px-3 py-2 rounded-lg bg-blue-600 text-white">{{ num }}</span>
-                                {% elif num >= movies.number|add:'-2' and num <= movies.number|add:'2' %}
-                                    <a href="?{% if query %}q={{ query }}&{% endif %}{% if search_type %}search_type={{ search_type }}&{% endif %}{% if sort_by %}sort={{ sort_by }}&{% endif %}page={{ num }}" 
-                                       class="px-3 py-2 rounded-lg bg-white text-gray-700 hover:bg-gray-100 transition-colors">
-                                        {{ num }}
-                                    </a>
-                                {% elif num == 1 or num == movies.paginator.num_pages %}
-                                    <a href="?{% if query %}q={{ query }}&{% endif %}{% if search_type %}search_type={{ search_type }}&{% endif %}{% if sort_by %}sort={{ sort_by }}&{% endif %}page={{ num }}" 
-                                       class="px-3 py-2 rounded-lg bg-white text-gray-700 hover:bg-gray-100 transition-colors">
-                                        {{ num }}
-                                    </a>
-                                {% elif num == movies.number|add:'-3' or num == movies.number|add:'3' %}
-                                    <span class="px-3 py-2 text-gray-700">...</span>
-                                {% endif %}
-                            {% endfor %}
-                            
-                            {% if movies.has_next %}
-                                <a href="?{% if query %}q={{ query }}&{% endif %}{% if search_type %}search_type={{ search_type }}&{% endif %}{% if sort_by %}sort={{ sort_by }}&{% endif %}page={{ movies.next_page_number }}" 
-                                   class="px-3 py-2 rounded-lg bg-white text-gray-700 hover:bg-gray-100 transition-colors">
-                                    <i class="fas fa-chevron-right"></i>
-                                </a>
-                            {% endif %}
-                        </nav>
                     </div>
                 {% endif %}
-            {% else %}
-                <div class="text-center py-16">
-                    <i class="fas fa-search text-6xl text-gray-400 mb-4"></i>
-                    <h3 class="text-2xl font-bold text-gray-600 mb-2">No Movies Found</h3>
-                    <p class="text-gray-500">
-                        {% if query %}
-                            Try adjusting your search terms or switch between keyword and semantic search.
-                        {% else %}
-                            Start by searching for movies, actors, or genres above.
-                        {% endif %}
-                    </p>
-                </div>
-            {% endif %}
+            </div>
         </div>
     </div>
 
