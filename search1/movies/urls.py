@@ -18,4 +18,7 @@ urlpatterns = [
     path('movie/<int:movie_id>/', views.movie_detail, name='movie_detail'),
     path('export-search-data/', views.export_search_data, name='export_search_data'),
     path('search-analytics/', views.search_analytics, name='search_analytics'),
+    
+    path('profile/', views.profile_view, name='profile'),
 ]
+

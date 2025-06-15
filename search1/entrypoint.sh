@@ -1,34 +1,28 @@
 #!/bin/bash
+set -e
 
-# Install netcat if not present
-apt-get update && apt-get install -y netcat-openbsd && rm -rf /var/lib/apt/lists/*
+echo "Waiting for Neo4j to be available..."
+while ! nc -z neo4j 7687; do
+  sleep 1
+done
+echo "Neo4j is up!"
 
-# Download spaCy model synchronously
-if ! python -c "import spacy; spacy.load('en_core_web_sm')" 2>/dev/null; then
-  echo "Downloading spaCy model en_core_web_sm..."
-  python -m spacy download en_core_web_sm
+echo "Waiting for Redis to be available..."
+while ! nc -z redis 6379; do
+  sleep 1
+done
+echo "Redis is up!"
+
+echo "Running migrations..."
+if ! python manage.py migrate > migration.log 2>&1; then
+  echo "Migration failed. Check migration.log for details:"
+  cat migration.log
+  exit 1
 fi
+echo "Migrations completed successfully"
 
-# Wait for Neo4j to be available
-until nc -z neo4j 7687; do
-  echo "Waiting for Neo4j to be available..."
-  sleep 2
-done
-
-# Wait for Redis to be available
-until nc -z redis 6379; do
-  echo "Waiting for Redis to be available..."
-  sleep 2
-done
-
-# Run Django migrations
-python manage.py migrate
-
-# Start the Django development server in the background
-python manage.py runserver 0.0.0.0:8000 &
-
-# Start the Jupyter Notebook server
+echo "Starting Jupyter notebook..."
 jupyter notebook --ip=0.0.0.0 --port=8888 --no-browser --allow-root --NotebookApp.token='' &
 
-# Keep the container running and wait for background processes
-wait
+echo "Starting Django server..."
+python manage.py runserver 0.0.0.0:8000

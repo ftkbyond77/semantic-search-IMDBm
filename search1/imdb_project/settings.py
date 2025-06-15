@@ -96,3 +96,5 @@ CACHES = {
         }
     }
 }
+
+SEARCH_INDEX_PATH = BASE_DIR / 'search_indices'
