@@ -1,27 +1,32 @@
+# Use Python 3.10 slim image
 FROM python:3.10-slim
 
-RUN apt-get update && apt-get install -y \
-    build-essential \
-    netcat-traditional \
-    libblas-dev \
-    liblapack-dev \
-    gfortran \
-    git \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
-
+# Set working directory
 WORKDIR /app
 
-COPY requirements.txt .
-RUN pip install --upgrade pip \
- && pip install torch==2.3.0 --index-url https://download.pytorch.org/whl/cpu \
- && pip install -r requirements.txt
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    gcc \
+    libpq-dev \
+    netcat-openbsd \
+    && rm -rf /var/lib/apt/lists/*
 
+# Install Python dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy project files
+COPY . .
+
+# Make entrypoint executable
 COPY entrypoint.sh .
 RUN chmod +x entrypoint.sh
 
-COPY . .
+# Collect static files
+RUN python manage.py collectstatic --noinput
 
-EXPOSE 8000 8888 7474 7687
+# Expose port
+EXPOSE 8000
 
-ENTRYPOINT ["./entrypoint.sh"]
+# Use entrypoint
+ENTRYPOINT ["/app/entrypoint.sh"]

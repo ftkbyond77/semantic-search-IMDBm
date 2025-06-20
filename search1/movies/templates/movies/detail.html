@@ -1,3 +1,4 @@
+{% load movie_filters %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -6,105 +7,48 @@
     <title>{{ movie.series_title }} - IMDB Movie Explorer</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    {% load movie_filters %}
     <style>
         .gradient-bg {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         }
-        .hero-section {
-            background: linear-gradient(rgba(0,0,0,0.7), rgba(0,0,0,0.5)), 
-                        url('https://images.unsplash.com/photo-1489599235165-11c4a5c4e83f?w=1200') center/cover;
-            min-height: 60vh;
-        }
-        .glass-card {
-            background: rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-        }
-        .info-card {
+        .movie-card {
             background: linear-gradient(145deg, #ffffff 0%, #f8fafc 100%);
-            transition: all 0.3s ease;
-        }
-        .info-card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
-        }
-        .star-rating {
-            color: #fbbf24;
-        }
-        .rating-input {
-            background: linear-gradient(145deg, #f1f5f9, #e2e8f0);
-        }
-        .boost-indicator {
-            background: linear-gradient(45deg, #10b981, #3b82f6);
-        }
-        .explanation-badge {
-            background: linear-gradient(45deg, #8b5cf6, #ec4899);
-        }
-        .related-movie {
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-        .related-movie:hover {
-            transform: scale(1.05) translateY(-5px);
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
-        }
-        .pulse-animation {
-            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-        }
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: .7; }
         }
         .fade-in {
-            animation: fadeIn 0.8s ease-in-out;
+            animation: fadeIn 0.6s ease-in-out;
         }
         @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(30px); }
+            from { opacity: 0; transform: translateY(20px); }
             to { opacity: 1; transform: translateY(0); }
-        }
-        .rating-bar {
-            background: linear-gradient(90deg, #ef4444, #f97316, #eab308, #84cc16, #22c55e);
-        }
-        .genre-tag {
-            background: linear-gradient(45deg, #3b82f6, #1d4ed8);
-        }
-        .cast-member {
-            background: linear-gradient(145deg, #fef3c7, #fbbf24);
-        }
-        .stats-card {
-            background: linear-gradient(145deg, #f0f9ff, #e0f2fe);
-            border: 1px solid #0ea5e9;
-        }
-        .review-card {
-            background: linear-gradient(145deg, #fefce8, #fef3c7);
-            border-left: 4px solid #f59e0b;
         }
     </style>
 </head>
 <body class="bg-gray-50 min-h-screen">
     <!-- Navigation -->
-    <nav class="gradient-bg shadow-lg relative z-10">
+    <nav class="gradient-bg shadow-lg">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between items-center h-16">
                 <div class="flex items-center">
-                    <a href="{% url 'movies:home' %}" class="text-white hover:text-yellow-300 transition-colors mr-4">
-                        <i class="fas fa-arrow-left text-xl"></i>
-                    </a>
                     <h1 class="text-2xl font-bold text-white flex items-center">
                         <i class="fas fa-film mr-2"></i>
-                        IMDB Explorer
+                        IMDB Movie Explorer
                     </h1>
                 </div>
                 <div class="flex items-center space-x-4">
                     {% if user_authenticated %}
                         <span class="text-white text-sm">Welcome, {{ user.username }}!</span>
+                        <a href="{% url 'movies:profile' %}" class="text-white hover:text-yellow-300 transition-colors">
+                            <i class="fas fa-user mr-1"></i>Profile
+                        </a>
                         <a href="{% url 'movies:logout' %}" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg transition-colors">
                             <i class="fas fa-sign-out-alt mr-1"></i>Logout
                         </a>
                     {% else %}
+                        <a href="{% url 'movies:home' %}?guest=true" class="text-white hover:text-yellow-300 transition-colors">
+                            <i class="fas fa-user-circle mr-1"></i>Guest Mode
+                        </a>
                         <a href="{% url 'movies:auth' %}" class="bg-white text-blue-600 px-4 py-2 rounded-lg font-medium hover:bg-gray-100 transition-colors">
-                            Login
+                            Login/Sign Up
                         </a>
                     {% endif %}
                 </div>
@@ -112,329 +56,113 @@
         </div>
     </nav>
 
-    <!-- Hero Section -->
-    <div class="hero-section flex items-center">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
-            <div class="glass-card p-8 rounded-2xl fade-in">
-                <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                    <!-- Movie Poster -->
-                    <div class="lg:col-span-1">
-                        <div class="aspect-w-2 aspect-h-3 rounded-xl overflow-hidden shadow-2xl">
-                            {% if movie.poster_link %}
-                                <img src="{{ movie.poster_link }}" alt="{{ movie.series_title }}" 
-                                     class="w-full h-96 object-cover"
-                                     onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 300 450%22><rect width=%22300%22 height=%22450%22 fill=%22%23e5e7eb%22/><text x=%22150%22 y=%22225%22 text-anchor=%22middle%22 fill=%22%23374151%22 font-size=%2224%22>No Image</text></svg>'">
-                            {% else %}
-                                <div class="w-full h-96 bg-gray-300 flex items-center justify-center">
-                                    <i class="fas fa-film text-6xl text-gray-500"></i>
-                                </div>
-                            {% endif %}
+    <!-- Main Container -->
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div class="movie-card rounded-lg shadow-lg p-6 fade-in">
+            <div class="flex flex-col md:flex-row gap-6">
+                <!-- Poster -->
+                <div class="md:w-1/3">
+                    {% if movie.poster_link %}
+                        <img src="{{ movie.poster_link }}" alt="{{ movie.series_title }}"
+                             class="w-full rounded-lg object-cover"
+                             onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 200 300%22><rect width=%22200%22 height=%22300%22 fill=%22%23e5e7eb%22/><text x=%22100%22 y=%22150%22 text-anchor=%22middle%22 fill=%22%23374151%22 font-size=%2216%22>No Image</text></svg>'">
+                    {% else %}
+                        <div class="w-full h-96 bg-gray-200 flex items-center justify-center rounded-lg">
+                            <i class="fas fa-film text-3xl text-gray-500"></i>
                         </div>
+                    {% endif %}
+                </div>
+
+                <!-- Movie Details -->
+                <div class="md:w-2/3">
+                    <h2 class="text-3xl font-bold text-gray-800 mb-4">{{ movie.series_title }}</h2>
+                    <div class="flex items-center mb-4">
+                        <div class="star-rating">
+                            {% for i in "12345" %}
+                                {% if movie.rating >= i|add:0 %}
+                                    <i class="fas fa-star text-yellow-400 text-lg"></i>
+                                {% else %}
+                                    <i class="far fa-star text-yellow-400 text-lg"></i>
+                                {% endif %}
+                            {% endfor %}
+                        </div>
+                        <span class="ml-2 text-lg text-gray-600">{{ movie.rating|floatformat:1 }} ({{ total_ratings }} ratings)</span>
                     </div>
+                    <p class="text-gray-600 mb-2">
+                        <strong>Year:</strong> {{ movie.released_year }} •
+                        <strong>Runtime:</strong> {{ movie.runtime|format_runtime }} •
+                        <strong>Genre:</strong> {{ movie.genre }}
+                    </p>
+                    <p class="text-gray-600 mb-2"><strong>Director:</strong> {{ movie.director|default:"N/A" }}</p>
+                    <p class="text-gray-600 mb-2"><strong>Stars:</strong>
+                        {{ movie.star1|default:"" }}{% if movie.star2 %}, {{ movie.star2 }}{% endif %}
+                        {% if movie.star3 %}, {{ movie.star3 }}{% endif %}{% if movie.star4 %}, {{ movie.star4 }}{% endif %}
+                    </p>
+                    {% if movie.awards %}
+                        <p class="text-gray-600 mb-2"><strong>Awards:</strong> {{ movie.awards }}</p>
+                    {% endif %}
+                    <p class="text-gray-600 mb-4">{{ movie.overview|default:"No overview available." }}</p>
 
-                    <!-- Movie Info -->
-                    <div class="lg:col-span-2 text-white">
-                        <h1 class="text-4xl md:text-6xl font-bold mb-4">{{ movie.series_title }}</h1>
-                        
-                        <!-- Rating and Basic Info -->
-                        <div class="flex flex-wrap items-center gap-4 mb-6">
-                            <div class="flex items-center bg-black bg-opacity-30 px-4 py-2 rounded-full">
-                                <div class="star-rating mr-2">
-                                    {% for i in "12345" %}
-                                        {% if movie.rating >= i|add:0 %}
-                                            <i class="fas fa-star text-xl"></i>
-                                        {% else %}
-                                            <i class="far fa-star text-xl"></i>
-                                        {% endif %}
-                                    {% endfor %}
-                                </div>
-                                <span class="text-2xl font-bold">{{ movie.rating }}</span>
-                            </div>
-                            
-                            <span class="bg-blue-600 px-4 py-2 rounded-full font-medium">{{ movie.released_year }}</span>
-                            {% if movie.runtime %}
-                                <span class="bg-green-600 px-4 py-2 rounded-full font-medium">
-                                    <i class="fas fa-clock mr-1"></i>{{ movie.runtime }}
-                                </span>
-                            {% endif %}
-                            {% if movie.certificate %}
-                                <span class="bg-purple-600 px-4 py-2 rounded-full font-medium">{{ movie.certificate }}</span>
-                            {% endif %}
-                        </div>
+                    <!-- User Rating -->
+                    {% if user_authenticated %}
+                        <form method="POST" class="mb-4">
+                            {% csrf_token %}
+                            {{ rating_form }}
+                            <button type="submit" class="mt-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors">
+                                Submit Rating
+                            </button>
+                        </form>
+                    {% endif %}
 
-                        <!-- Genres -->
-                        <div class="mb-6">
-                            <h3 class="text-xl font-semibold mb-2">Genres</h3>
-                            <div class="flex flex-wrap gap-2">
-                                {% for genre in movie.genre|split:"," %}
-                                    <span class="genre-tag text-white px-3 py-1 rounded-full text-sm font-medium">{{ genre|strip }}</span>
+                    <!-- Match Explanation -->
+                    {% if boost_factors %}
+                        <div class="mb-4">
+                            <h3 class="text-lg font-semibold text-gray-800 mb-2">Why this movie?</h3>
+                            <ul class="list-disc list-inside text-gray-600">
+                                {% for explanation in boost_factors.explanations %}
+                                    <li>{{ explanation }}</li>
                                 {% endfor %}
-                            </div>
+                            </ul>
                         </div>
-
-                        <!-- Overview -->
-                        <div class="mb-6">
-                            <h3 class="text-xl font-semibold mb-2">Overview</h3>
-                            <p class="text-lg opacity-90 leading-relaxed">{{ movie.overview|default:"No overview available." }}</p>
-                        </div>
-
-                        <!-- Cast -->
-                        <div class="mb-6">
-                            <h3 class="text-xl font-semibold mb-3">Cast & Crew</h3>
-                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                {% if movie.director %}
-                                    <div class="cast-member p-3 rounded-lg">
-                                        <p class="font-medium text-gray-800">Director</p>
-                                        <p class="text-gray-700">{{ movie.director }}</p>
-                                    </div>
-                                {% endif %}
-                                {% if movie.star1 %}
-                                    <div class="cast-member p-3 rounded-lg">
-                                        <p class="font-medium text-gray-800">Stars</p>
-                                        <p class="text-gray-700">{{ movie.star1 }}{% if movie.star2 %}, {{ movie.star2 }}{% endif %}</p>
-                                    </div>
-                                {% endif %}
-                            </div>
-                        </div>
-                    </div>
+                    {% endif %}
                 </div>
             </div>
         </div>
+
+        <!-- Related Movies -->
+        {% if related_movies %}
+            <div class="mt-8">
+                <h3 class="text-2xl font-bold text-gray-800 mb-4 fade-in">Related Movies</h3>
+                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+                    {% for related_movie in related_movies %}
+                        {% include 'movies/movie_card.html' with movie=related_movie %}
+                    {% endfor %}
+                </div>
+            </div>
+        {% endif %}
     </div>
 
-    <!-- Main Content -->
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <!-- Left Column - Details -->
-            <div class="lg:col-span-2 space-y-8">
-                <!-- User Rating Section -->
-                <div class="info-card p-6 rounded-xl shadow-lg">
-                    <h2 class="text-2xl font-bold mb-4 flex items-center">
-                        <i class="fas fa-star text-yellow-500 mr-2"></i>
-                        Rate This Movie
-                    </h2>
-                    <div class="flex items-center space-x-4 mb-4">
-                        <div class="flex space-x-1" id="userRating">
-                            <i class="fas fa-star text-gray-300 hover:text-yellow-500 cursor-pointer text-2xl" data-rating="1"></i>
-                            <i class="fas fa-star text-gray-300 hover:text-yellow-500 cursor-pointer text-2xl" data-rating="2"></i>
-                            <i class="fas fa-star text-gray-300 hover:text-yellow-500 cursor-pointer text-2xl" data-rating="3"></i>
-                            <i class="fas fa-star text-gray-300 hover:text-yellow-500 cursor-pointer text-2xl" data-rating="4"></i>
-                            <i class="fas fa-star text-gray-300 hover:text-yellow-500 cursor-pointer text-2xl" data-rating="5"></i>
-                        </div>
-                        <span id="ratingValue" class="text-lg font-medium">Rate it!</span>
-                    </div>
-                    <button id="submitRating" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg transition-colors disabled:opacity-50" disabled>
-                        Submit Rating
-                    </button>
+    <!-- Messages -->
+    {% if messages %}
+        <div class="fixed top-4 right-4 z-50">
+            {% for message in messages %}
+                <div class="alert bg-{{ message.tags }}-500 text-white px-6 py-3 rounded-lg shadow-lg mb-2 fade-in">
+                    {{ message }}
                 </div>
-
-                <!-- Movie Statistics -->
-                <div class="info-card p-6 rounded-xl shadow-lg">
-                    <h2 class="text-2xl font-bold mb-6 flex items-center">
-                        <i class="fas fa-chart-bar text-blue-600 mr-2"></i>
-                        Movie Statistics
-                    </h2>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        {% if movie.gross %}
-                            <div class="stats-card p-4 rounded-lg">
-                                <h3 class="font-semibold text-gray-700 mb-2">Box Office</h3>
-                                <p class="text-2xl font-bold text-blue-600">{{ movie.gross }}</p>
-                            </div>
-                        {% endif %}
-                        {% if movie.no_of_votes %}
-                            <div class="stats-card p-4 rounded-lg">
-                                <h3 class="font-semibold text-gray-700 mb-2">IMDB Votes</h3>
-                                <p class="text-2xl font-bold text-blue-600">{{ movie.no_of_votes }}</p>
-                            </div>
-                        {% endif %}
-                        {% if movie.metascore %}
-                            <div class="stats-card p-4 rounded-lg">
-                                <h3 class="font-semibold text-gray-700 mb-2">Metascore</h3>
-                                <p class="text-2xl font-bold text-blue-600">{{ movie.metascore }}/100</p>
-                            </div>
-                        {% endif %}
-                    </div>
-                </div>
-
-                <!-- User Reviews -->
-                <div class="info-card p-6 rounded-xl shadow-lg">
-                    <h2 class="text-2xl font-bold mb-6 flex items-center">
-                        <i class="fas fa-comments text-green-600 mr-2"></i>
-                        User Reviews
-                    </h2>
-                    <div class="space-y-4">
-                        {% if reviews %}
-                            {% for review in reviews %}
-                                <div class="review-card p-4 rounded-lg">
-                                    <div class="flex items-center mb-2">
-                                        <div class="star-rating mr-2">
-                                            {% for i in "12345" %}
-                                                {% if review.rating >= i|add:0 %}
-                                                    <i class="fas fa-star text-sm"></i>
-                                                {% else %}
-                                                    <i class="far fa-star text-sm"></i>
-                                                {% endif %}
-                                            {% endfor %}
-                                        </div>
-                                        <span class="font-medium">{{ review.user.username }}</span>
-                                    </div>
-                                    <p class="text-gray-700">{{ review.comment|default:"No comment provided." }}</p>
-                                </div>
-                            {% endfor %}
-                        {% else %}
-                            <p class="text-gray-700">No reviews yet. Be the first to review this movie!</p>
-                        {% endif %}
-                    </div>
-                </div>
-            </div>
-
-            <!-- Right Column - Sidebar -->
-            <div class="space-y-8">
-                <!-- Quick Actions -->
-                <div class="info-card p-6 rounded-xl shadow-lg">
-                    <h3 class="text-xl font-bold mb-4">Quick Actions</h3>
-                    <div class="space-y-3">
-                        <button class="w-full bg-green-600 hover:bg-green-700 text-white py-3 px-4 rounded-lg transition-colors flex items-center justify-center">
-                            <i class="fas fa-heart mr-2"></i>
-                            Add to Favorites
-                        </button>
-                        <button class="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 px-4 rounded-lg transition-colors flex items-center justify-center">
-                            <i class="fas fa-bookmark mr-2"></i>
-                            Add to Watchlist
-                        </button>
-                        <button class="w-full bg-purple-600 hover:bg-purple-700 text-white py-3 px-4 rounded-lg transition-colors flex items-center justify-center">
-                            <i class="fas fa-share mr-2"></i>
-                            Share Movie
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Related Movies -->
-                <div class="info-card p-6 rounded-xl shadow-lg">
-                    <h3 class="text-xl font-bold mb-4">You Might Also Like</h3>
-                    <div class="space-y-4">
-                        {% if related_movies %}
-                            {% for related in related_movies %}
-                                <div class="related-movie p-3 rounded-lg border border-gray-200 cursor-pointer">
-                                    <div class="flex items-center space-x-3">
-                                        {% if related.poster_link %}
-                                            <img src="{{ related.poster_link }}" alt="{{ related.series_title }}" 
-                                                 class="w-12 h-16 object-cover rounded"
-                                                 onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 60 90%22><rect width=%2260%22 height=%2290%22 fill=%22%23e5e7eb%22/><text x=%2230%22 y=%2245%22 text-anchor=%22middle%22 fill=%22%23374151%22 font-size=%2212%22>No Image</text></svg>'">
-                                        {% else %}
-                                            <div class="w-12 h-16 bg-gray-300 flex items-center justify-center rounded">
-                                                <i class="fas fa-film text-xl text-gray-500"></i>
-                                            </div>
-                                        {% endif %}
-                                        <div>
-                                            <h4 class="font-medium">{{ related.series_title }}</h4>
-                                            <p class="text-sm text-gray-600">{{ related.released_year }} • {{ related.rating }}★</p>
-                                        </div>
-                                    </div>
-                                </div>
-                            {% endfor %}
-                        {% else %}
-                            <p class="text-gray-600">No related movies found.</p>
-                        {% endif %}
-                    </div>
-                </div>
-
-                <!-- Movie Facts -->
-                <div class="info-card p-6 rounded-xl shadow-lg">
-                    <h3 class="text-xl font-bold mb-4">Movie Facts</h3>
-                    <div class="space-y-3 text-sm">
-                        {% if movie.language %}
-                            <div class="flex justify-between">
-                                <span class="text-gray-600">Language:</span>
-                                <span class="font-medium">{{ movie.language }}</span>
-                            </div>
-                        {% endif %}
-                        {% if movie.country %}
-                            <div class="flex justify-between">
-                                <span class="text-gray-600">Country:</span>
-                                <span class="font-medium">{{ movie.country }}</span>
-                            </div>
-                        {% endif %}
-                        {% if movie.awards %}
-                            <div class="flex justify-between">
-                                <span class="text-gray-600">Awards:</span>
-                                <span class="font-medium">{{ movie.awards }}</span>
-                            </div>
-                        {% endif %}
-                    </div>
-                </div>
-            </div>
+            {% endfor %}
         </div>
-    </div>
-
-    <!-- Footer -->
-    <footer class="gradient-bg text-white py-8 mt-12">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-            <p class="text-lg">© 2025 IMDB Movie Explorer. All rights reserved.</p>
-            <p class="text-sm opacity-75 mt-2">Discover, rate, and explore your favorite movies</p>
-        </div>
-    </footer>
+    {% endif %}
 
     <script>
-        // Star rating functionality
-        const stars = document.querySelectorAll('#userRating i');
-        const ratingValue = document.getElementById('ratingValue');
-        const submitButton = document.getElementById('submitRating');
-        let currentRating = 0;
-
-        stars.forEach((star, index) => {
-            star.addEventListener('click', () => {
-                currentRating = index + 1;
-                updateStars(currentRating);
-                ratingValue.textContent = `${currentRating} star${currentRating > 1 ? 's' : ''}`;
-                submitButton.disabled = false;
+        // Auto-hide messages
+        setTimeout(() => {
+            const alerts = document.querySelectorAll('.alert');
+            alerts.forEach(alert => {
+                alert.style.opacity = '0';
+                alert.style.transform = 'translateX(100%)';
+                setTimeout(() => alert.remove(), 300);
             });
-
-            star.addEventListener('mouseenter', () => {
-                updateStars(index + 1);
-            });
-        });
-
-        document.getElementById('userRating').addEventListener('mouseleave', () => {
-            updateStars(currentRating);
-        });
-
-        function updateStars(rating) {
-            stars.forEach((star, index) => {
-                if (index < rating) {
-                    star.classList.remove('text-gray-300');
-                    star.classList.add('text-yellow-500');
-                } else {
-                    star.classList.remove('text-yellow-500');
-                    star.classList.add('text-gray-300');
-                }
-            });
-        }
-
-        submitButton.addEventListener('click', () => {
-            alert(`Thank you for rating this movie ${currentRating} star${currentRating > 1 ? 's' : ''}!`);
-            submitButton.textContent = 'Rating Submitted!';
-            submitButton.disabled = true;
-            submitButton.classList.add('bg-green-600');
-        });
-
-        // Add click handlers for related movies
-        document.querySelectorAll('.related-movie').forEach(movie => {
-            movie.addEventListener('click', () => {
-                // In a real app, this would navigate to the movie's detail page
-                alert('Navigating to movie details...');
-            });
-        });
-
-        // Add click handlers for action buttons
-        document.querySelectorAll('.info-card button').forEach(button => {
-            if (!button.id) { // Skip the rating submit button
-                button.addEventListener('click', () => {
-                    const action = button.textContent.trim();
-                    alert(`${action} functionality would be implemented here!`);
-                });
-            }
-        });
+        }, 5000);
     </script>
 </body>
 </html>

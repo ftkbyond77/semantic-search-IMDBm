@@ -1,17 +1,23 @@
+{% load movie_filters %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Search Analytics - IMDB Movie Explorer</title>
+    <title>{{ user.username }}'s Profile - IMDB Movie Explorer</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         .gradient-bg {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         }
-        .analytics-card {
+        .card {
             background: linear-gradient(145deg, #ffffff 0%, #f8fafc 100%);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.15);
         }
         .fade-in {
             animation: fadeIn 0.6s ease-in-out;
@@ -33,16 +39,13 @@
                 <div class="flex items-center">
                     <h1 class="text-2xl font-bold text-white flex items-center">
                         <i class="fas fa-film mr-2"></i>
-                        IMDB Movie Explorer
+                        IMDB Explorer
                     </h1>
                 </div>
                 <div class="flex items-center space-x-4">
                     <span class="text-white text-sm">Welcome, {{ user.username }}!</span>
                     <a href="{% url 'movies:home' %}" class="text-white hover:text-yellow-300 transition-colors">
                         <i class="fas fa-home mr-1"></i>Home
-                    </a>
-                    <a href="{% url 'movies:profile' %}" class="text-white hover:text-yellow-300 transition-colors">
-                        <i class="fas fa-user mr-1"></i>Profile
                     </a>
                     <a href="{% url 'movies:logout' %}" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg transition-colors">
                         <i class="fas fa-sign-out-alt mr-1"></i>Logout
@@ -55,62 +58,69 @@
     <!-- Main Container -->
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <h2 class="text-3xl font-bold text-gray-800 mb-6 fade-in">
-            <i class="fas fa-chart-bar mr-2 text-blue-600"></i>Search Analytics
+            <i class="fas fa-user-circle mr-2 text-blue-600"></i>Your Profile
         </h2>
 
-        <!-- Overview -->
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
-            <div class="analytics-card p-4 rounded-lg shadow-lg fade-in">
-                <h3 class="text-lg font-semibold text-gray-800 mb-2">Total Searches</h3>
-                <p class="text-2xl font-bold text-blue-600">{{ total_searches }}</p>
-            </div>
-            <div class="analytics-card p-4 rounded-lg shadow-lg fade-in">
-                <h3 class="text-lg font-semibold text-gray-800 mb-2">Keyword Searches</h3>
-                <p class="text-2xl font-bold text-blue-600">{{ keyword_searches }}</p>
-            </div>
-            <div class="analytics-card p-4 rounded-lg shadow-lg fade-in">
-                <h3 class="text-lg font-semibold text-gray-800 mb-2">Semantic Searches</h3>
-                <p class="text-2xl font-bold text-blue-600">{{ semantic_searches }}</p>
-            </div>
+        <!-- User Info -->
+        <div class="card p-6 rounded-lg shadow-lg mb-8 fade-in">
+            <h3 class="text-xl font-semibold text-gray-800 mb-4">Account Details</h3>
+            <p class="text-gray-600"><strong>Username:</strong> {{ user.username }}</p>
+            <p class="text-gray-600"><strong>Email:</strong> {{ user.email|default:"Not provided" }}</p>
+            <p class="text-gray-600"><strong>Joined:</strong> {{ user.date_joined|date:"F d, Y" }}</p>
         </div>
 
-        <!-- Popular Queries -->
-        <div class="analytics-card p-6 rounded-lg shadow-lg mb-8 fade-in">
-            <h3 class="text-xl font-semibold text-gray-800 mb-4">Popular Queries</h3>
-            {% if popular_queries %}
+        <!-- Search History -->
+        <div class="card p-6 rounded-lg shadow-lg mb-8 fade-in">
+            <h3 class="text-xl font-semibold text-gray-800 mb-4">Recent Searches</h3>
+            {% if search_history %}
                 <ul class="space-y-3">
-                    {% for query in popular_queries %}
-                        <li class="flex justify-between">
-                            <span class="text-gray-600">{{ query.query }}</span>
-                            <span class="text-gray-600">{{ query.count }} searches</span>
+                    {% for search in search_history %}
+                        <li class="flex justify-between items-center">
+                            <a href="{% url 'movies:search' %}?q={{ search.query }}&search_type={{ search.search_type }}"
+                               class="text-blue-600 hover:underline">
+                                {{ search.query }} ({{ search.search_type|title }})
+                            </a>
+                            <span class="text-sm text-gray-500">{{ search.timestamp|date:"F d, Y H:i" }}</span>
                         </li>
                     {% endfor %}
                 </ul>
             {% else %}
-                <p class="text-gray-600">No search queries available.</p>
+                <p class="text-gray-600">No search history available.</p>
             {% endif %}
         </div>
 
-        <!-- Active Users -->
-        <div class="analytics-card p-6 rounded-lg shadow-lg mb-8 fade-in">
-            <h3 class="text-xl font-semibold text-gray-800 mb-4">Active Users</h3>
-            {% if user_search_counts %}
+        <!-- Ratings -->
+        <div class="card p-6 rounded-lg shadow-lg mb-8 fade-in">
+            <h3 class="text-xl font-semibold text-gray-800 mb-4">Your Ratings</h3>
+            {% if ratings %}
                 <ul class="space-y-3">
-                    {% for user in user_search_counts %}
-                        <li class="flex justify-between">
-                            <span class="text-gray-600">{{ user.user__username }}</span>
-                            <span class="text-gray-600">{{ user.count }} searches</span>
+                    {% for rating in ratings %}
+                        <li class="flex justify-between items-center">
+                            <a href="{% url 'movies:movie_detail' rating.movie.id %}"
+                               class="text-blue-600 hover:underline">
+                                {{ rating.movie.series_title }}
+                            </a>
+                            <div class="flex items-center">
+                                {% for i in "12345" %}
+                                    {% if rating.rating >= i|add:0 %}
+                                        <i class="fas fa-star text-yellow-400 text-sm"></i>
+                                    {% else %}
+                                        <i class="far fa-star text-yellow-400 text-sm"></i>
+                                    {% endif %}
+                                {% endfor %}
+                                <span class="ml-2 text-sm text-gray-500">({{ rating.rating }})</span>
+                            </div>
                         </li>
                     {% endfor %}
                 </ul>
             {% else %}
-                <p class="text-gray-600">No user search data available.</p>
+                <p class="text-gray-600">You haven't rated any movies yet.</p>
             {% endif %}
         </div>
 
         <!-- Trending Concepts -->
         {% if trending_concepts %}
-            <div class="analytics-card p-6 rounded-lg shadow-lg fade-in">
+            <div class="card p-6 rounded-lg shadow-lg fade-in">
                 <h3 class="text-xl font-semibold text-gray-800 mb-4">Trending Concepts</h3>
                 <div class="flex flex-wrap gap-2">
                     {% for concept in trending_concepts %}
@@ -121,14 +131,6 @@
                 </div>
             </div>
         {% endif %}
-
-        <!-- Export Data -->
-        <div class="mt-8 text-center">
-            <a href="{% url 'movies:export_search_data' %}"
-               class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium transition-colors">
-                <i class="fas fa-download mr-2"></i>Export Search Data
-            </a>
-        </div>
     </div>
 
     <!-- Messages -->

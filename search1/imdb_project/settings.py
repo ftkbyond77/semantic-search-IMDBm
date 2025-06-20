@@ -1,19 +1,28 @@
+"""
+Django settings for imdb_project project.
+
+For more information on this file, see
+https://docs.djangoproject.com/en/4.2/topics/settings/
+For the full list of settings and their values, see
+https://docs.djangoproject.com/en/4.2/ref/settings/
+"""
+
 from pathlib import Path
 import os
-from dotenv import load_dotenv
 
-load_dotenv()
-
-NEO4J_URI = os.getenv('NEO4J_URI', 'bolt://localhost:7687')
-
+# Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = 'django-insecure-2dpol1y(i4&17mj*=4gj&sn%l9nejbpkj)z8=&=5sqf$@%p79$'
+# SECURITY WARNING: keep the secret key used in production secret!
+# Hardcoded for local development only
+SECRET_KEY = 'django-insecure-local-dev-2dpol1y(i4&17mj*=4gj&sn%l9nejbpkj)z8=&=5sqf'
 
-DEBUG = os.getenv('DJANGO_DEBUG', 'True') == 'True'
+# SECURITY WARNING: don't run with debug turned on in production!
+DEBUG = True
 
 ALLOWED_HOSTS = ['localhost', '127.0.0.1', '0.0.0.0']
 
+# Application definition
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
@@ -21,7 +30,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'movies',
+    'movies.apps.MoviesConfig',  # Use app config for proper namespace
 ]
 
 MIDDLEWARE = [
@@ -54,6 +63,8 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'imdb_project.wsgi.application'
 
+# Database
+# https://docs.djangoproject.com/en/4.2/ref/settings/#databases
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
@@ -61,6 +72,8 @@ DATABASES = {
     }
 }
 
+# Password validation
+# https://docs.djangoproject.com/en/4.2/ref/settings/#auth-password-validators
 AUTH_PASSWORD_VALIDATORS = [
     {
         'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
@@ -76,27 +89,73 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
+# Internationalization
+# https://docs.djangoproject.com/en/4.2/topics/i18n/
 LANGUAGE_CODE = 'en-us'
 TIME_ZONE = 'America/Anchorage'
 USE_I18N = True
 USE_TZ = True
 
-STATIC_URL = 'static/'
+# Static files (CSS, JavaScript, Images)
+# https://docs.djangoproject.com/en/4.2/howto/static-files/
+STATIC_URL = '/static/'
 STATICFILES_DIRS = [BASE_DIR / 'static']
-STATIC_ROOT = BASE_DIR / "staticfiles"
+STATIC_ROOT = BASE_DIR / 'staticfiles'
 
+# Default primary key field type
+# https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+# Redis configuration
+REDIS_HOST = os.getenv('REDIS_HOST', 'redis')
+REDIS_PORT = int(os.getenv('REDIS_PORT', 6379))
 CACHES = {
     'default': {
         'BACKEND': 'django_redis.cache.RedisCache',
-        'LOCATION': 'redis://redis:6379/1',
+        'LOCATION': f'redis://{REDIS_HOST}:{REDIS_PORT}/1',
         'OPTIONS': {
             'CLIENT_CLASS': 'django_redis.client.DefaultClient',
         }
     }
 }
 
+# Neo4j and search index paths
+NEO4J_URI = os.getenv('NEO4J_URI', 'bolt://neo4j:7687')
 SEARCH_INDEX_PATH = BASE_DIR / 'search_indices'
-SESSION_COOKIE_AGE = 1209600
+
+# Session settings
+SESSION_COOKIE_AGE = 1209600  # 2 weeks
 SESSION_COOKIE_SECURE = False
+CSRF_COOKIE_SECURE = False
+
+# Logging configuration
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '{levelname} {asctime} {module} {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'file': {
+            'level': 'INFO',
+            'class': 'logging.FileHandler',
+            'filename': BASE_DIR / 'logs' / 'app.log',
+            'formatter': 'verbose',
+        },
+        'console': {
+            'level': 'DEBUG',
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
+        },
+    },
+    'loggers': {
+        '': {
+            'handlers': ['file', 'console'],
+            'level': 'INFO',
+            'propagate': True,
+        },
+    },
+}
