@@ -8,7 +8,10 @@ class Command(BaseCommand):
 
     def handle(self, *args, **kwargs):
         uri = settings.NEO4J_URI
-        driver = GraphDatabase.driver(uri)
+        user = settings.NEO4J_USER
+        password = settings.NEO4J_PASSWORD
+
+        driver = GraphDatabase.driver(uri, auth=(user, password))
 
         def create_graph(tx, movie):
             tx.run("""
