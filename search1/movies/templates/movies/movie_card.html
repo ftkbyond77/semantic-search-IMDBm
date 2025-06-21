@@ -1,45 +1,49 @@
-{% load movie_filters %}
-<div class="movie-card rounded-lg overflow-hidden shadow-lg flex flex-col h-full transition-all hover:transform hover:-translate-y-2 hover:shadow-2xl">
+{% load custom_filters %}
+<div class="movie-card bg-white rounded-lg shadow-md overflow-hidden transition-transform hover:scale-105">
     <div class="relative">
-        {% if movie.poster_link %}
-            <img src="{{ movie.poster_link }}" alt="{{ movie.series_title }}" 
-                 class="w-full h-48 object-cover"
-                 onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 200 300%22><rect width=%22200%22 height=%22300%22 fill=%22%23e5e7eb%22/><text x=%22100%22 y=%22150%22 text-anchor=%22middle%22 fill=%22%23374151%22 font-size=%2216%22>No Image</text></svg>'">
+        {% if movie.poster %}
+            <img src="{{ movie.poster }}" alt="{{ movie.series_title }} poster" class="w-full h-64 object-cover">
         {% else %}
-            <div class="w-full h-48 bg-gray-200 flex items-center justify-center">
-                <i class="fas fa-film text-3xl text-gray-500"></i>
+            <div class="w-full h-64 bg-gray-200 flex items-center justify-center">
+                <span class="text-gray-500">No Poster</span>
             </div>
         {% endif %}
         {% if show_similarity %}
-            <div class="absolute top-2 right-2 bg-gradient-to-r from-purple-500 to-blue-500 text-white px-2 py-1 rounded-full text-xs font-bold">
-                {{ item.similarity|floatformat:1 }}% match
+            <div class="absolute top-2 right-2 bg-blue-600 text-white text-xs font-bold px-2 py-1 rounded">
+                {{ movie.similarity|floatformat:1 }}%
             </div>
         {% endif %}
     </div>
-    <div class="p-4 flex flex-col flex-grow">
-        <div class="flex-1">
-            <h3 class="font-bold text-base text-gray-800 mb-2 line-clamp-2">{{ movie.series_title }}</h3>
-            <div class="flex items-center justify-between mb-2">
-                <div class="star-rating">
-                    {% for i in "12345" %}
-                        {% if movie.rating >= i|add:0 %}
-                            <i class="fas fa-star text-yellow-400 text-sm"></i>
-                        {% else %}
-                            <i class="far fa-star text-yellow-400 text-sm"></i>
-                        {% endif %}
-                    {% endfor %}
-                </div>
-                <span class="text-sm text-gray-600">{{ movie.rating|floatformat:1 }}</span>
+    <div class="p-4">
+        <div class="flex justify-between items-start mb-2">
+            <h3 class="text-base font-semibold text-gray-800 line-clamp-2">
+                <a href="{% url 'movies:movie_detail' movie.id %}" class="hover:text-blue-600">
+                    {{ movie.series_title }}
+                </a>
+            </h3>
+            <div class="flex items-center space-x-1">
+                {% for i in "12345" %}
+                    {% if forloop.counter <= movie.rating|floatformat:0|add:0 %}
+                        <svg class="w-4 h-4 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M10 15l-5.5 3 1-5.8L1 7.5l6-0.5L10 1l3 6.1 6 0.5-4.5 4.7 1 5.8z"/>
+                        </svg>
+                    {% else %}
+                        <svg class="w-4 h-4 text-gray-300" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M10 15l-5.5 3 1-5.8L1 7.5l6-0.5L10 1l3 6.1 6 0.5-4.5 4.7 1 5.8z"/>
+                        </svg>
+                    {% endif %}
+                {% endfor %}
             </div>
-            <p class="text-xs text-gray-600 mb-2">
-                {{ movie.released_year }} • {{ movie.runtime|format_runtime }}
-                {% if movie.awards %} • {{ movie.awards|truncatechars:20 }}{% endif %}
-            </p>
-            <p class="text-xs text-gray-500 line-clamp-3">{{ movie.overview|default:"No overview available." }}</p>
+            <span class="text-sm text-gray-600">{{ movie.rating|floatformat:1 }}</span>
         </div>
-        <a href="{% url 'movies:movie_detail' movie.id %}" 
-           class="mt-3 block w-full bg-blue-600 hover:bg-blue-700 text-white text-center py-2 rounded-lg text-sm font-medium transition-colors">
-            View Details
-        </a>
+        <p class="text-xs text-gray-600 mb-2">
+            {{ movie.released_year }} • {{ movie.runtime|format_runtime }}
+            {% if movie.awards %} • {{ movie.awards|truncatechars:20 }}{% endif %}
+        </p>
+        <p class="text-xs text-gray-500 line-clamp-3">{{ movie.overview|default:"No overview available." }}</p>
     </div>
+    <a href="{% url 'movies:movie_detail' movie.id %}" 
+       class="mt-3 block w-full bg-blue-600 hover:bg-blue-700 text-white text-center py-2 rounded-lg text-sm font-medium transition-colors">
+        View Details
+    </a>
 </div>

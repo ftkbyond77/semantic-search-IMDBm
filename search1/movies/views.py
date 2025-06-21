@@ -20,10 +20,137 @@ from scipy.sparse.linalg import svds
 import redis
 import pickle
 import zlib
-from neo4j import GraphDatabase
+from neo4j import GraphDatabase, basic_auth
+import os 
+import dotenv
+dotenv.load_dotenv()
 
 logger = logging.getLogger(__name__)
 
+NEO4J_URI = os.getenv("NEO4J_URI", "bolt://localhost:7687")
+NEO4J_USER = os.getenv("NEO4J_USER", "neo4j")
+NEO4J_PASSWORD = os.getenv("NEO4J_PASSWORD", "password")
+
+driver = GraphDatabase.driver(
+    NEO4J_URI,
+    auth=basic_auth(NEO4J_USER, NEO4J_PASSWORD)
+)
+
+
+def home(request) -> HttpResponse:
+    """Handle the main search page."""
+    is_guest = request.GET.get('guest') == 'true'
+
+    if not request.user.is_authenticated and not is_guest:
+        return redirect('movies:auth')
+
+    search_type = request.GET.get('search_type', 'keyword')
+    query = request.GET.get('q', '').strip()
+    sort_by = request.GET.get('sort', 'rating')
+    page_number = int(request.GET.get('page', 1))
+
+    all_movies = Movie.objects.select_related().prefetch_related('user_ratings')
+    show_similarity = False
+    recommendations = []
+    search_suggestions = []
+    results_count = 0
+    match_explanation = None
+    skg = SemanticKnowledgeGraph()
+    trending_concepts = skg.get_trending_concepts(days=7, limit=5)
+    movie_stats = get_movie_stats()
+    movies = []
+
+    try:
+        if query:
+            user_id = request.user.id if request.user.is_authenticated else None
+            if search_type == 'keyword':
+                query_terms = query.lower().split()
+                q_objects = Q()
+                for term in query_terms:
+                    q_objects |= (
+                        Q(series_title__icontains=term) |
+                        Q(genre__icontains=term) |
+                        Q(director__icontains=term) |
+                        Q(star1__icontains=term) |
+                        Q(star2__icontains=term) |
+                        Q(star3__icontains=term) |
+                        Q(star4__icontains=term) |
+                        Q(overview__icontains=term)
+                    )
+
+                movies = all_movies.filter(q_objects).distinct()
+                results_count = movies.count()
+
+                if sort_by == 'rating':
+                    movies = movies.order_by('-rating')
+                elif sort_by == 'year':
+                    movies = movies.order_by('-released_year')
+                else:
+                    movies = movies.order_by('series_title')
+
+            elif search_type == 'semantic':
+                searcher = HybridSearch()
+                expanded_terms = skg.expand_query(query, user_id=user_id)
+                combined_query = f"{query} {' '.join(expanded_terms)}"
+                search_results = searcher.search(combined_query, user_id=user_id, top_k=50, rerank_k=10)
+
+                # Normalize movies to a list of Movie objects
+                movies = [result['movie'] for result in search_results]
+                show_similarity = True
+                results_count = len(movies)
+
+                match_explanation = {
+                    'query': query,
+                    'expanded_terms': expanded_terms,
+                    'boost_factors': [
+                        {
+                            'movie_id': result['movie'].id,
+                            'explanations': skg.get_recommendation_explanation(query, expanded_terms, result['movie'])
+                        }
+                        for result in search_results
+                    ]
+                }
+                request.session['match_explanation'] = match_explanation
+
+            save_search_history(request, query, search_type, results_count)
+            if user_id:
+                skg.update_from_user_interaction(user_id, None, 'search')
+        else:
+            movies = all_movies.order_by('-rating', '-no_of_votes')[:10]
+            results_count = len(movies)
+
+        paginator = Paginator(movies, 12)
+        movies = paginator.get_page(page_number)
+
+        user_id = request.user.id if request.user.is_authenticated else None
+        session_id = get_or_create_session_id(request)
+        recommendations = get_recommendations(request, all_movies, num_recommendations=5)
+        search_suggestions = get_search_based_suggestions(request, user_id, session_id, all_movies, num_suggestions=5)
+
+    except Exception as e:
+        logger.error(f"Home page error: {str(e)}")
+        messages.error(request, 'An error occurred while processing your request.')
+        movies = []
+        results_count = 0
+
+    logger.info(f"Rendering home page: query='{query}', results_count={results_count}, search_type={search_type}")
+    return render(request, 'movies/home.html', {
+        'movies': movies,
+        'query': query,
+        'search_type': search_type,
+        'sort_by': sort_by,
+        'show_similarity': show_similarity,
+        'user_authenticated': request.user.is_authenticated,
+        'user': request.user,
+        'recommendations': recommendations,
+        'search_suggestions': search_suggestions,
+        'results_count': results_count,
+        'is_staff': request.user.is_staff if request.user.is_authenticated else False,
+        'is_guest': is_guest,
+        'trending_concepts': trending_concepts,
+        'movie_stats': movie_stats,
+    })
+    
 class RatingForm(forms.Form):
     rating = forms.ChoiceField(
         choices=[(i, f"{i} stars") for i in range(1, 6)],
