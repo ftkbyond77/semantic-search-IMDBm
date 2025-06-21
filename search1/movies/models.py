@@ -3,30 +3,30 @@ from django.contrib.auth.models import User
 from django.utils import timezone
 
 class Movie(models.Model):
-    series_title = models.CharField(max_length=255, null=True, blank=True)
-    released_year = models.IntegerField(null=True, blank=True)
-    runtime = models.CharField(max_length=50, null=True, blank=True)
-    genre = models.CharField(max_length=255, null=True, blank=True)
+    series_title = models.CharField(max_length=255, unique=True)
+    released_year = models.PositiveIntegerField(null=True, blank=True)
+    runtime = models.CharField(max_length=50, blank=True)
+    genre = models.CharField(max_length=255, blank=True)
     rating = models.FloatField(null=True, blank=True)
-    no_of_votes = models.IntegerField(default=0, null=True, blank=True)
-    director = models.CharField(max_length=255, null=True, blank=True)
-    star1 = models.CharField(max_length=255, null=True, blank=True)
-    star2 = models.CharField(max_length=255, null=True, blank=True)
-    star3 = models.CharField(max_length=255, null=True, blank=True)
-    star4 = models.CharField(max_length=255, null=True, blank=True)
-    overview = models.TextField(null=True, blank=True)
-    poster_link = models.URLField(null=True, blank=True)
-    awards = models.CharField(max_length=255, null=True, blank=True)
+    no_of_votes = models.PositiveIntegerField(default=0)
+    director = models.CharField(max_length=255, blank=True)
+    star1 = models.CharField(max_length=255, blank=True)
+    star2 = models.CharField(max_length=255, blank=True)
+    star3 = models.CharField(max_length=255, blank=True)
+    star4 = models.CharField(max_length=255, blank=True)
+    overview = models.TextField(blank=True)
+    poster_link = models.URLField(blank=True)
+    awards = models.TextField(blank=True)
+    certificate = models.CharField(max_length=50, blank=True)
+    embedding = models.JSONField(null=True, blank=True)
+    gross = models.CharField(max_length=100, blank=True)
+    meta_score = models.PositiveIntegerField(null=True, blank=True)
 
     def __str__(self):
-        return self.series_title or "Untitled Movie"
+        return self.series_title
 
     class Meta:
-        indexes = [
-            models.Index(fields=['series_title']),
-            models.Index(fields=['genre']),
-            models.Index(fields=['director']),
-        ]
+        db_table = 'movies_movie'
 
 class Rating(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
