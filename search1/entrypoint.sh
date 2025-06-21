@@ -31,14 +31,8 @@ timeout 60 bash -c 'while ! nc -z redis 6379; do sleep 1; done' || {
 }
 log "Redis is up!"
 
-# Run migrations
-log "Running Django migrations..."
-if ! python manage.py migrate > /app/logs/migration.log 2>&1; then
-    log "ERROR: Django migrations failed. Check /app/logs/migration.log for details:"
-    cat /app/logs/migration.log >> "$LOG_FILE"
-    exit 1
-fi
-log "Django migrations completed successfully."
+# Skip migrations for debugging
+log "Skipping migrations for manual execution..."
 
 # Collect static files
 log "Collecting static files..."
@@ -48,16 +42,6 @@ if ! python manage.py collectstatic --noinput > /app/logs/collectstatic.log 2>&1
     exit 1
 fi
 log "Static files collected successfully."
-
-# Optionally start Jupyter notebook (commented out as it may not be needed)
-# log "Starting Jupyter notebook on port 8888..."
-# jupyter notebook --ip=0.0.0.0 --port=8888 --no-browser --allow-root --NotebookApp.token='' > /app/logs/jupyter.log 2>&1 &
-# if [ $? -eq 0 ]; then
-#     log "Jupyter notebook started successfully."
-# else
-#     log "ERROR: Failed to start Jupyter notebook. Check /app/logs/jupyter.log for details."
-#     cat /app/logs/jupyter.log >> "$LOG_FILE"
-# fi
 
 # Start Django server
 log "Starting Django development server on 0.0.0.0:8000..."

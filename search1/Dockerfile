@@ -18,6 +18,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy project files
 COPY . .
 
+# Create logs directory
+RUN mkdir -p /app/logs /app/staticfiles /app/static && \
+    chmod -R 777 /app/logs /app/staticfiles /app/static
+
 # Make entrypoint executable
 COPY entrypoint.sh .
 RUN chmod +x entrypoint.sh

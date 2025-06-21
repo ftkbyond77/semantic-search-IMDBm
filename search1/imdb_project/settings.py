@@ -119,8 +119,18 @@ CACHES = {
     }
 }
 
-# Neo4j and search index paths
-NEO4J_URI = os.getenv('NEO4J_URI', 'bolt://neo4j:7687')
+# Neo4j configuration
+NEO4J_URI = os.getenv('NEO4J_URI', 'bolt://localhost:7687')
+NEO4J_USER = os.getenv('NEO4J_USER', 'neo4j')
+
+if DEBUG:
+    # ใน local development ให้ใช้ password ว่าง (no password)
+    NEO4J_PASSWORD = os.getenv('NEO4J_PASSWORD', '')
+else:
+    # ใน production ควรกำหนดรหัสผ่านผ่าน environment variable
+    NEO4J_PASSWORD = os.getenv('NEO4J_PASSWORD', 'your_production_password')
+
+# Search index path
 SEARCH_INDEX_PATH = BASE_DIR / 'search_indices'
 
 # Session settings
@@ -132,29 +142,22 @@ CSRF_COOKIE_SECURE = False
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
-    'formatters': {
-        'verbose': {
-            'format': '{levelname} {asctime} {module} {message}',
-            'style': '{',
-        },
-    },
     'handlers': {
         'file': {
-            'level': 'INFO',
+            'level': 'DEBUG',
             'class': 'logging.FileHandler',
-            'filename': BASE_DIR / 'logs' / 'app.log',
-            'formatter': 'verbose',
+            'filename': os.path.join(os.path.dirname(__file__), '..', 'logs', 'app.log'),
+            'delay': True,  # Delay file opening until first log
         },
         'console': {
             'level': 'DEBUG',
             'class': 'logging.StreamHandler',
-            'formatter': 'verbose',
         },
     },
     'loggers': {
-        '': {
-            'handlers': ['file', 'console'],
-            'level': 'INFO',
+        'django': {
+            'handlers': ['console', 'file'],
+            'level': 'DEBUG',
             'propagate': True,
         },
     },
