@@ -50,6 +50,7 @@ def home(request) -> HttpResponse:
     page_number = int(request.GET.get('page', 1))
 
     all_movies = Movie.objects.select_related().prefetch_related('user_ratings')
+    logger.info(f"Total movies in database: {all_movies.count()}")  # Debug log
     show_similarity = False
     recommendations = []
     search_suggestions = []
@@ -80,6 +81,7 @@ def home(request) -> HttpResponse:
 
                 movies = all_movies.filter(q_objects).distinct()
                 results_count = movies.count()
+                logger.info(f"Keyword search query '{query}' returned {results_count} results")  # Debug log
 
                 if sort_by == 'rating':
                     movies = movies.order_by('-rating')
@@ -93,9 +95,16 @@ def home(request) -> HttpResponse:
                 expanded_terms = skg.expand_query(query, user_id=user_id)
                 combined_query = f"{query} {' '.join(expanded_terms)}"
                 search_results = searcher.search(combined_query, user_id=user_id, top_k=50, rerank_k=10)
+                logger.info(f"Semantic search query '{query}' returned {len(search_results)} results")  # Debug log
 
-                # Normalize movies to a list of Movie objects
-                movies = [result['movie'] for result in search_results]
+                movies = [
+                    {
+                        'movie': result['movie'],
+                        'similarity': min(100, result['score'] * 100),
+                        'explanations': skg.get_recommendation_explanation(query, expanded_terms, result['movie'])
+                    }
+                    for result in search_results
+                ]
                 show_similarity = True
                 results_count = len(movies)
 
@@ -104,10 +113,10 @@ def home(request) -> HttpResponse:
                     'expanded_terms': expanded_terms,
                     'boost_factors': [
                         {
-                            'movie_id': result['movie'].id,
-                            'explanations': skg.get_recommendation_explanation(query, expanded_terms, result['movie'])
+                            'movie_id': m['movie'].id,
+                            'explanations': m['explanations']
                         }
-                        for result in search_results
+                        for m in movies
                     ]
                 }
                 request.session['match_explanation'] = match_explanation
@@ -118,6 +127,7 @@ def home(request) -> HttpResponse:
         else:
             movies = all_movies.order_by('-rating', '-no_of_votes')[:10]
             results_count = len(movies)
+            logger.info(f"Default view returned {results_count} popular movies")  # Debug log
 
         paginator = Paginator(movies, 12)
         movies = paginator.get_page(page_number)

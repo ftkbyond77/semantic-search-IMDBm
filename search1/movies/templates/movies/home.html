@@ -297,18 +297,17 @@
                             {% if show_similarity %}
                                 {% include 'movies/movie_card.html' with movie=item.movie show_similarity=True item=item %}
                             {% else %}
-                                {% include 'movies/movie_card.html' with movie=movie %}
+                                {% include 'movies/movie_card.html' with movie=item %}
                             {% endif %}
                         {% endfor %}
                     </div>
-
                     <!-- Pagination -->
                     {% if movies.has_other_pages %}
                         <div class="flex justify-center mt-8">
                             <nav class="flex items-center space-x-1">
                                 {% if movies.has_previous %}
                                     <a href="?{% if query %}q={{ query }}&{% endif %}{% if search_type %}search_type={{ search_type }}&{% endif %}{% if sort_by %}sort={{ sort_by }}&{% endif %}{% if is_guest %}guest=true&{% endif %}page={{ movies.previous_page_number }}" 
-                                       class="px-3 py-2 rounded-lg bg-white text-gray-700 hover:bg-gray-100 transition-colors">
+                                    class="px-3 py-2 rounded-lg bg-white text-gray-700 hover:bg-gray-100 transition-colors">
                                         <i class="fas fa-chevron-left"></i>
                                     </a>
                                 {% endif %}
@@ -317,12 +316,12 @@
                                         <span class="px-3 py-2 rounded-lg bg-blue-600 text-white">{{ num }}</span>
                                     {% elif num >= movies.number|add:'-2' and num <= movies.number|add:'2' %}
                                         <a href="?{% if query %}q={{ query }}&{% endif %}{% if search_type %}search_type={{ search_type }}&{% endif %}{% if sort_by %}sort={{ sort_by }}&{% endif %}{% if is_guest %}guest=true&{% endif %}page={{ num }}" 
-                                           class="px-3 py-2 rounded-lg bg-white text-gray-700 hover:bg-gray-100 transition-colors">
+                                        class="px-3 py-2 rounded-lg bg-white text-gray-700 hover:bg-gray-100 transition-colors">
                                             {{ num }}
                                         </a>
                                     {% elif num == 1 or num == movies.paginator.num_pages %}
                                         <a href="?{% if query %}q={{ query }}&{% endif %}{% if search_type %}search_type={{ search_type }}&{% endif %}{% if sort_by %}sort={{ sort_by }}&{% endif %}{% if is_guest %}guest=true&{% endif %}page={{ num }}" 
-                                           class="px-3 py-2 rounded-lg bg-white text-gray-700 hover:bg-gray-100 transition-colors">
+                                        class="px-3 py-2 rounded-lg bg-white text-gray-700 hover:bg-gray-100 transition-colors">
                                             {{ num }}
                                         </a>
                                     {% elif num == movies.number|add:'-3' or num == movies.number|add:'3' %}
@@ -331,7 +330,7 @@
                                 {% endfor %}
                                 {% if movies.has_next %}
                                     <a href="?{% if query %}q={{ query }}&{% endif %}{% if search_type %}search_type={{ search_type }}&{% endif %}{% if sort_by %}sort={{ sort_by }}&{% endif %}{% if is_guest %}guest=true&{% endif %}page={{ movies.next_page_number }}" 
-                                       class="px-3 py-2 rounded-lg bg-white text-gray-700 hover:bg-gray-100 transition-colors">
+                                    class="px-3 py-2 rounded-lg bg-white text-gray-700 hover:bg-gray-100 transition-colors">
                                         <i class="fas fa-chevron-right"></i>
                                     </a>
                                 {% endif %}
@@ -352,8 +351,6 @@
                     </div>
                 {% endif %}
             </div>
-        </div>
-
         <!-- Sidebar -->
         <div class="w-80 hidden lg:block">
             <div class="sticky top-8">
