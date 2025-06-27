@@ -2,7 +2,7 @@ docker-compose exec web python manage.py makemigrations --dry-run
     docker-compose exec web python manage.py makemigrations
     docker-compose exec web python manage.py migrate
 
-docker-composes exec web python manage.py import_imdb_data
+docker-compose exec web python manage.py import_imdb_data
 
 docker-compose exec web python manage.py seed_data
 

@@ -400,10 +400,10 @@ def get_movie_stats() -> Dict[str, Any]:
     """Get general movie statistics."""
     try:
         return {
-            'total_movies': Movie.objects.count(),  # Removed extra parenthesis
+            'total_movies': Movie.objects.count(),
             'avg_rating': Movie.objects.aggregate(avg_rating=Avg('rating'))['avg_rating'] or 0.0,
-            'genres': Movie.objects.values('genres').annotate(count=Count('genres')).order_by('-count')[:5],
-            'recent_years': Movie.objects.filter(released_year__gte=timezone.now().year - 5).count(),
+            'top_genres': Movie.objects.values('genre').annotate(count=Count('genre')).order_by('-count')[:5],
+            'recent_movies': Movie.objects.filter(released_year__gte=timezone.now().year - 5).count(),
             'total_ratings': Rating.objects.count(),
         }
     except Exception as e:

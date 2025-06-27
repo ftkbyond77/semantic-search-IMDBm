@@ -1,10 +1,10 @@
-{% load custom_filters %}
+{% load movie_filters %}
 <div class="movie-card bg-white rounded-lg shadow-md overflow-hidden transition-transform hover:scale-105">
     <div class="relative">
         {% if movie.poster_link %}
             <img src="{{ movie.poster_link }}" alt="{{ movie.series_title }} poster" class="w-full h-64 object-cover">
         {% else %}
-            <div class="w-full h-64 bg-gray-200 flex items-center justify-center">
+            <div class="w-full h-64 bg-gray-200 flex items-center justify-content-center">
                 <span class="text-gray-500">No Poster</span>
             </div>
         {% endif %}

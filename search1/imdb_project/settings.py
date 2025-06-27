@@ -67,8 +67,12 @@ WSGI_APPLICATION = 'imdb_project.wsgi.application'
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': 'dbname',
+        'USER': 'user',
+        'PASSWORD': 'password',
+        'HOST': 'db',
+        'PORT': '5432',
     }
 }
 
@@ -131,7 +135,8 @@ else:
     NEO4J_PASSWORD = os.getenv('NEO4J_PASSWORD', 'your_production_password')
 
 # Search index path
-SEARCH_INDEX_PATH = BASE_DIR / 'search_indices'
+# SEARCH_INDEX_PATH = BASE_DIR / 'search_indices'
+SEARCH_INDEX_PATH = os.getenv('SEARCH_INDEX_PATH', '/app/search_indices')
 
 # Session settings
 SESSION_COOKIE_AGE = 1209600  # 2 weeks

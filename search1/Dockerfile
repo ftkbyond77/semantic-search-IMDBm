@@ -1,4 +1,3 @@
-# Use Python 3.10 slim image
 FROM python:3.10-slim
 
 # Set working directory
@@ -18,16 +17,13 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy project files
 COPY . .
 
-# Create logs directory
+# Create logs and static directories
 RUN mkdir -p /app/logs /app/staticfiles /app/static && \
     chmod -R 777 /app/logs /app/staticfiles /app/static
 
 # Make entrypoint executable
 COPY entrypoint.sh .
 RUN chmod +x entrypoint.sh
-
-# Collect static files
-RUN python manage.py collectstatic --noinput
 
 # Expose port
 EXPOSE 8000
