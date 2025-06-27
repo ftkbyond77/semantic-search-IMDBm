@@ -13,6 +13,9 @@
         .movie-card {
             background: linear-gradient(145deg, #ffffff 0%, #f8fafc 100%);
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex;
+            flex-direction: column;
+            height: 100%;
         }
         .movie-card:hover {
             transform: translateY(-8px) scale(1.02);
@@ -85,9 +88,27 @@
             display: flex;
             flex-direction: column;
             height: 100%;
+            flex-grow: 1;
         }
         .movie-details {
             flex-grow: 1;
+        }
+        .view-details-container {
+            margin-top: auto;
+            padding-top: 1rem;
+            border-top: 1px solid #e5e7eb;
+        }
+        .line-clamp-2 {
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+        .line-clamp-3 {
+            display: -webkit-box;
+            -webkit-line-clamp: 3;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
         }
     </style>
 </head>
@@ -294,11 +315,60 @@
                 {% if movies %}
                     <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8">
                         {% for item in movies %}
-                            {% if show_similarity %}
-                                {% include 'movies/movie_card.html' with movie=item.movie show_similarity=True item=item %}
-                            {% else %}
-                                {% include 'movies/movie_card.html' with movie=item %}
-                            {% endif %}
+                            <div class="movie-card rounded-lg shadow-md overflow-hidden">
+                                <!-- Movie Poster -->
+                                <div class="relative">
+                                    {% if item.poster_url %}
+                                        <img src="{{ item.poster_url }}" alt="{{ item.series_title }}" class="movie-poster w-full">
+                                    {% else %}
+                                        <div class="movie-poster-placeholder w-full">
+                                            <i class="fas fa-film text-gray-400 text-4xl"></i>
+                                        </div>
+                                    {% endif %}
+                                    {% if show_similarity and item.similarity %}
+                                        <div class="absolute bottom-0 left-0 right-0 bg-black bg-opacity-50 text-white p-2 text-sm">
+                                            <div class="similarity-bar h-1 rounded-full mb-1" style="width: {{ item.similarity|floatformat:2 }}%"></div>
+                                            <div class="flex justify-between">
+                                                <span>Match:</span>
+                                                <span>{{ item.similarity|floatformat:2 }}%</span>
+                                            </div>
+                                        </div>
+                                    {% endif %}
+                                </div>
+                                
+                                <!-- Movie Content -->
+                                <div class="movie-content p-4">
+                                    <div class="movie-details">
+                                        <h3 class="font-bold text-lg mb-1 line-clamp-2">{{ item.series_title }}</h3>
+                                        <div class="flex items-center text-sm text-gray-600 mb-2">
+                                            <span class="mr-2">{{ item.released_year }}</span>
+                                            <span>•</span>
+                                            <span class="mx-2">{{ item.runtime }} min</span>
+                                            <span>•</span>
+                                            <span class="ml-2">{{ item.genre|truncatechars:15 }}</span>
+                                        </div>
+                                        <div class="star-rating mb-3">
+                                            {% for i in "12345" %}
+                                                {% if item.rating >= i|add:0 %}
+                                                    <i class="fas fa-star"></i>
+                                                {% else %}
+                                                    <i class="far fa-star"></i>
+                                                {% endif %}
+                                            {% endfor %}
+                                            <span class="ml-1 text-gray-700">{{ item.rating }}</span>
+                                        </div>
+                                        <p class="text-gray-600 text-sm line-clamp-3">{{ item.overview|default:"No description available" }}</p>
+                                    </div>
+                                    
+                                    <!-- View Details Button - now properly aligned -->
+                                    <div class="view-details-container">
+                                        <a href="{% url 'movies:movie_detail' item.id %}" 
+                                           class="block w-full text-center bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg transition-colors">
+                                            View Details
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
                         {% endfor %}
                     </div>
                     <!-- Pagination -->
@@ -351,6 +421,8 @@
                     </div>
                 {% endif %}
             </div>
+        </div>
+
         <!-- Sidebar -->
         <div class="w-80 hidden lg:block">
             <div class="sticky top-8">
