@@ -3,11 +3,10 @@ FROM python:3.10-slim
 # Set working directory
 WORKDIR /app
 
-# Install system dependencies
+# Install system dependencies (postgresql-client and netcat-traditional)
 RUN apt-get update && apt-get install -y \
-    gcc \
-    libpq-dev \
-    netcat-openbsd \
+    postgresql-client \
+    netcat-traditional \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python dependencies
@@ -17,16 +16,16 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy project files
 COPY . .
 
-# Create logs and static directories
-RUN mkdir -p /app/logs /app/staticfiles /app/static && \
-    chmod -R 777 /app/logs /app/staticfiles /app/static
+# Create necessary directories with appropriate permissions
+RUN mkdir -p /app/logs /app/static /app/staticfiles /app/search_indices && \
+    chmod -R 755 /app/logs /app/static /app/staticfiles /app/search_indices
 
 # Make entrypoint executable
-COPY entrypoint.sh .
-RUN chmod +x entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
 
 # Expose port
 EXPOSE 8000
 
-# Use entrypoint
+# Set entrypoint and default command
 ENTRYPOINT ["/app/entrypoint.sh"]
+CMD ["gunicorn", "--bind", "0.0.0.0:8000", "imdb_project.wsgi:application"]

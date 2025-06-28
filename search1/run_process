@@ -10,3 +10,5 @@ docker-compose exec web python manage.py precompute_indices
 
 docker-compose exec web python manage.py import_graph
 
+
+docker-compose exec db psql -U user -d dbname -c "SELECT COUNT(*) FROM movies_movie;"docker-compose exec neo4j neo4j-admin check-consistency

@@ -68,9 +68,9 @@ WSGI_APPLICATION = 'imdb_project.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'dbname',
-        'USER': 'user',
-        'PASSWORD': 'password',
+        'NAME': os.getenv('POSTGRES_DB', 'dbname'),
+        'USER': os.getenv('POSTGRES_USER', 'user'),
+        'PASSWORD': os.getenv('POSTGRES_PASSWORD', 'password'),
         'HOST': 'db',
         'PORT': '5432',
     }
@@ -103,8 +103,8 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/4.2/howto/static-files/
 STATIC_URL = '/static/'
-STATICFILES_DIRS = [BASE_DIR / 'static']
-STATIC_ROOT = BASE_DIR / 'staticfiles'
+STATICFILES_DIRS = [os.path.join(BASE_DIR, 'static')]
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field

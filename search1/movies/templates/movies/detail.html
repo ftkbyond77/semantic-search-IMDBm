@@ -1,168 +1,101 @@
-{% load movie_filters %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ movie.series_title }} - IMDB Movie Explorer</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <style>
-        .gradient-bg {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        }
-        .movie-card {
-            background: linear-gradient(145deg, #ffffff 0%, #f8fafc 100%);
-        }
-        .fade-in {
-            animation: fadeIn 0.6s ease-in-out;
-        }
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-    </style>
+    <title>{{ movie.series_title }} - IMDb Explorer</title>
+    <link rel="stylesheet" href="{% static 'css/styles.css' %}">
+    <link rel="icon" href="{% static 'favicon.ico' %}">
 </head>
-<body class="bg-gray-50 min-h-screen">
-    <!-- Navigation -->
-    <nav class="gradient-bg shadow-lg">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex justify-between items-center h-16">
-                <div class="flex items-center">
-                    <h1 class="text-2xl font-bold text-white flex items-center">
-                        <i class="fas fa-film mr-2"></i>
-                        IMDB Movie Explorer
-                    </h1>
-                </div>
-                <div class="flex items-center space-x-4">
-                    {% if user_authenticated %}
-                        <span class="text-white text-sm">Welcome, {{ user.username }}!</span>
-                        <a href="{% url 'movies:profile' %}" class="text-white hover:text-yellow-300 transition-colors">
-                            <i class="fas fa-user mr-1"></i>Profile
-                        </a>
-                        <a href="{% url 'movies:logout' %}" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg transition-colors">
-                            <i class="fas fa-sign-out-alt mr-1"></i>Logout
-                        </a>
-                    {% else %}
-                        <a href="{% url 'movies:home' %}?guest=true" class="text-white hover:text-yellow-300 transition-colors">
-                            <i class="fas fa-user-circle mr-1"></i>Guest Mode
-                        </a>
-                        <a href="{% url 'movies:auth' %}" class="bg-white text-blue-600 px-4 py-2 rounded-lg font-medium hover:bg-gray-100 transition-colors">
-                            Login/Sign Up
-                        </a>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
-    </nav>
+<body>
+    <header>
+        <h1><a href="{% url 'movies:home' %}">IMDb Movie Explorer</a></h1>
+        <nav>
+            {% if user_authenticated %}
+                <a href="{% url 'movies:profile' %}">Profile</a>
+                <a href="{% url 'movies:logout' %}">Logout</a>
+                {% if is_staff %}
+                    <a href="{% url 'movies:search_analytics' %}">Analytics</a>
+                    <a href="{% url 'movies:export_search_data' %}">Export Data</a>
+                {% endif %}
+            {% else %}
+                <a href="{% url 'movies:auth' %}">Login / Signup</a>
+            {% endif %}
+        </nav>
+    </header>
+    <main>
+        <section class="movie-detail">
+            <h2>{{ movie.series_title }} ({{ movie.released_year }})</h2>
+            {% if movie.poster_link %}
+                <img src="{{ movie.poster_link }}" alt="{{ movie.series_title }} Poster" class="movie-poster">
+            {% endif %}
+            <p><strong>Genre:</strong> {{ movie.genre }}</p>
+            <p><strong>Director:</strong> {{ movie.director }}</p>
+            <p><strong>Stars:</strong> {{ movie.star1 }}, {{ movie.star2 }}, {{ movie.star3 }}, {{ movie.star4 }}</p>
+            <p><strong>Overview:</strong> {{ movie.overview }}</p>
+            <p><strong>Rating:</strong> {{ movie.rating|floatformat:1 }} ({{ movie.no_of_votes }} votes)</p>
+            <p><strong>Average User Rating:</strong> {{ avg_rating|floatformat:1 }} ({{ total_ratings }} ratings)</p>
+            <p><strong>Runtime:</strong> {{ movie.runtime }} minutes</p>
+            <p><strong>Certificate:</strong> {{ movie.certificate }}</p>
+            <p><strong>Awards:</strong> {{ movie.awards }}</p>
+            <p><strong>Gross:</strong> {{ movie.gross }}</p>
+            <p><strong>Meta Score:</strong> {{ movie.meta_score }}</p>
 
-    <!-- Main Container -->
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div class="movie-card rounded-lg shadow-lg p-6 fade-in">
-            <div class="flex flex-col md:flex-row gap-6">
-                <!-- Poster -->
-                <div class="md:w-1/3">
-                    {% if movie.poster_link %}
-                        <img src="{{ movie.poster_link }}" alt="{{ movie.series_title }}"
-                             class="w-full rounded-lg object-cover"
-                             onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 200 300%22><rect width=%22200%22 height=%22300%22 fill=%22%23e5e7eb%22/><text x=%22100%22 y=%22150%22 text-anchor=%22middle%22 fill=%22%23374151%22 font-size=%2216%22>No Image</text></svg>'">
-                    {% else %}
-                        <div class="w-full h-96 bg-gray-200 flex items-center justify-center rounded-lg">
-                            <i class="fas fa-film text-3xl text-gray-500"></i>
-                        </div>
-                    {% endif %}
-                </div>
+            {% if match_explanation %}
+                <p><strong>Match Explanation:</strong> {{ match_explanation }}</p>
+            {% endif %}
+            {% if boost_factors %}
+                <p><strong>Boost Factors:</strong> {{ boost_factors }}</p>
+            {% endif %}
 
-                <!-- Movie Details -->
-                <div class="md:w-2/3">
-                    <h2 class="text-3xl font-bold text-gray-800 mb-4">{{ movie.series_title }}</h2>
-                    <div class="flex items-center mb-4">
-                        <div class="star-rating">
-                            {% for i in "12345" %}
-                                {% if movie.rating >= i|add:0 %}
-                                    <i class="fas fa-star text-yellow-400 text-lg"></i>
-                                {% else %}
-                                    <i class="far fa-star text-yellow-400 text-lg"></i>
-                                {% endif %}
-                            {% endfor %}
-                        </div>
-                        <span class="ml-2 text-lg text-gray-600">{{ movie.rating|floatformat:1 }} ({{ total_ratings }} ratings)</span>
-                    </div>
-                    <p class="text-gray-600 mb-2">
-                        <strong>Year:</strong> {{ movie.released_year }} •
-                        <strong>Runtime:</strong> {{ movie.runtime|format_runtime }} •
-                        <strong>Genre:</strong> {{ movie.genre }}
-                    </p>
-                    <p class="text-gray-600 mb-2"><strong>Director:</strong> {{ movie.director|default:"N/A" }}</p>
-                    <p class="text-gray-600 mb-2"><strong>Stars:</strong>
-                        {{ movie.star1|default:"" }}{% if movie.star2 %}, {{ movie.star2 }}{% endif %}
-                        {% if movie.star3 %}, {{ movie.star3 }}{% endif %}{% if movie.star4 %}, {{ movie.star4 }}{% endif %}
-                    </p>
-                    {% if movie.awards %}
-                        <p class="text-gray-600 mb-2"><strong>Awards:</strong> {{ movie.awards }}</p>
-                    {% endif %}
-                    <p class="text-gray-600 mb-4">{{ movie.overview|default:"No overview available." }}</p>
+            {% if user_authenticated %}
+                <form method="post" action="{% url 'movies:movie_detail' movie_id=movie.id %}">
+                    {% csrf_token %}
+                    {{ rating_form.as_p }}
+                    <button type="submit">Submit Rating</button>
+                </form>
+            {% endif %}
+            {% if user_rating %}
+                <p><strong>Your Rating:</strong> {{ user_rating.rating }} stars</p>
+            {% endif %}
+        </section>
 
-                    <!-- User Rating -->
-                    {% if user_authenticated %}
-                        <form method="POST" class="mb-4">
-                            {% csrf_token %}
-                            {{ rating_form }}
-                            <button type="submit" class="mt-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors">
-                                Submit Rating
-                            </button>
-                        </form>
-                    {% endif %}
-
-                    <!-- Match Explanation -->
-                    {% if boost_factors %}
-                        <div class="mb-4">
-                            <h3 class="text-lg font-semibold text-gray-800 mb-2">Why this movie?</h3>
-                            <ul class="list-disc list-inside text-gray-600">
-                                {% for explanation in boost_factors.explanations %}
-                                    <li>{{ explanation }}</li>
-                                {% endfor %}
-                            </ul>
-                        </div>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
-
-        <!-- Related Movies -->
-        {% if related_movies %}
-            <div class="mt-8">
-                <h3 class="text-2xl font-bold text-gray-800 mb-4 fade-in">Related Movies</h3>
-                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+        <section class="related-movies">
+            <h3>Related Movies</h3>
+            {% if related_movies %}
+                <ul>
                     {% for related_movie in related_movies %}
-                        {% include 'movies/movie_card.html' with movie=related_movie %}
+                        <li>
+                            <a href="{% url 'movies:movie_detail' movie_id=related_movie.id %}">
+                                {{ related_movie.series_title }} ({{ related_movie.released_year }})
+                            </a>
+                        </li>
                     {% endfor %}
-                </div>
-            </div>
-        {% endif %}
-    </div>
+                </ul>
+            {% else %}
+                <p>No related movies found.</p>
+            {% endif %}
+        </section>
 
-    <!-- Messages -->
-    {% if messages %}
-        <div class="fixed top-4 right-4 z-50">
-            {% for message in messages %}
-                <div class="alert bg-{{ message.tags }}-500 text-white px-6 py-3 rounded-lg shadow-lg mb-2 fade-in">
-                    {{ message }}
-                </div>
+        <section class="ratings">
+            <h3>User Ratings</h3>
+            {% if ratings %}
+                <ul>
+                    {% for rating in ratings %}
+                        <li>{{ rating.user.username }}: {{ rating.rating }} stars ({{ rating.timestamp|date:"Y-m-d" }})</li>
+                    {% endfor %}
+                </ul>
+            {% else %}
+                <p>No user ratings yet.</p>
+            {% endif %}
+            <h4>Rating Distribution</h4>
+            {% for i in "12345" %}
+                <p>{{ i }} Star: {{ rating_distribution.i }} ratings</p>
             {% endfor %}
-        </div>
-    {% endif %}
-
-    <script>
-        // Auto-hide messages
-        setTimeout(() => {
-            const alerts = document.querySelectorAll('.alert');
-            alerts.forEach(alert => {
-                alert.style.opacity = '0';
-                alert.style.transform = 'translateX(100%)';
-                setTimeout(() => alert.remove(), 300);
-            });
-        }, 5000);
-    </script>
+        </section>
+    </main>
+    <footer>
+        <p>&copy; 2025 IMDb Movie Explorer</p>
+    </footer>
 </body>
 </html>

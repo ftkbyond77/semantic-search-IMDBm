@@ -1,51 +1,53 @@
 services:
   web:
     build: .
-    command: /app/entrypoint.sh
-    volumes:
-      - .:/app
-      - search_indices:/app/search_indices
     ports:
       - "8000:8000"
+    volumes:
+      - .:/app
+      - ./logs:/app/logs
+      - ./search_indices:/app/search_indices
     depends_on:
       - db
       - neo4j
       - redis
     environment:
-      - DATABASE_URL=postgres://user:password@db:5432/dbname
+      - POSTGRES_DB=dbname
+      - POSTGRES_USER=user
+      - POSTGRES_PASSWORD=password
       - NEO4J_URI=bolt://neo4j:7687
       - NEO4J_USER=neo4j
       - NEO4J_PASSWORD=password
       - REDIS_HOST=redis
       - REDIS_PORT=6379
+      - CSV_FILE_PATH=/app/data/cleaned_imdb_data.csv
       - SEARCH_INDEX_PATH=/app/search_indices
-
   db:
     image: postgres:13
+    environment:
+      POSTGRES_DB: dbname
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    environment:
-      - POSTGRES_USER=user
-      - POSTGRES_PASSWORD=password
-      - POSTGRES_DB=dbname
-
+    ports:
+      - "5432:5432"
   neo4j:
-    image: neo4j:latest
+    image: neo4j:5.24
+    environment:
+      NEO4J_AUTH: neo4j/password
     volumes:
       - neo4j_data:/data
     ports:
-      - "7474:7474"  # HTTP port for Neo4j Browser
-      - "7687:7687"  # Bolt port for application
-    environment:
-      - NEO4J_AUTH=neo4j/password
-
+      - "7474:7474"
+      - "7687:7687"
   redis:
-    image: redis:latest
+    image: redis:alpine
     volumes:
       - redis_data:/data
-
+    ports:
+      - "6379:6379"
 volumes:
   postgres_data:
   neo4j_data:
   redis_data:
-  search_indices:
