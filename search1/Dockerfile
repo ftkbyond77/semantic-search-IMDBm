@@ -1,31 +1,28 @@
-FROM python:3.10-slim
-
-# Set working directory
-WORKDIR /app
-
-# Install system dependencies (postgresql-client and netcat-traditional)
-RUN apt-get update && apt-get install -y \
-    postgresql-client \
-    netcat-traditional \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install Python dependencies
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Copy project files
-COPY . .
-
-# Create necessary directories with appropriate permissions
-RUN mkdir -p /app/logs /app/static /app/staticfiles /app/search_indices && \
-    chmod -R 755 /app/logs /app/static /app/staticfiles /app/search_indices
-
-# Make entrypoint executable
-RUN chmod +x /app/entrypoint.sh
-
-# Expose port
-EXPOSE 8000
-
-# Set entrypoint and default command
-ENTRYPOINT ["/app/entrypoint.sh"]
-CMD ["gunicorn", "--bind", "0.0.0.0:8000", "imdb_project.wsgi:application"]
+ FROM python:3.10-slim
+ 
+ # System dependencies
+ RUN apt-get update && apt-get install -y \
+     build-essential \
+     && rm -rf /var/lib/apt/lists/*
+ 
+ # Set working directory
+ WORKDIR /app
+ 
+ # Install Python dependencies
+ COPY requirements.txt .
+ RUN pip install --upgrade pip \
+  && pip install torch==2.3.0 --index-url https://download.pytorch.org/whl/cpu \
+  && pip install -r requirements.txt
+ 
+ # Copy the entrypoint script and make it executable
+ COPY entrypoint.sh .
+ RUN chmod +x entrypoint.sh
+ 
+ # Copy your Django project
+ COPY . .
+ 
+ # Expose ports for Django (8000) and Jupyter (8888) NEO4j (7474)
+ EXPOSE 8000 8888 7474
+ 
+ # Use the entrypoint script to start services
+ ENTRYPOINT ["./entrypoint.sh"]
