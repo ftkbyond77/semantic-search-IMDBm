@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>MVPro Search</title>
+</head>
+<body>
+    <h1>MVPro Movie Search</h1>
+    <input type="text" id="searchInput" placeholder="Search movies...">
+    <button onclick="search()">Search</button>
+    <h2>Keyword Results</h2>
+    <ul id="keywordResults"></ul>
+    <h2>Semantic Results</h2>
+    <ul id="semanticResults"></ul>
+    <h2>Graph Results</h2>
+    <ul id="graphResults"></ul>
+
+    <script>
+        async function search() {
+            const query = document.getElementById('searchInput').value;
+            const response = await fetch(`/api/search/?q=${query}`);
+            const data = await response.json();
+            document.getElementById('keywordResults').innerHTML = data.keyword_results.map(r => `<li>${r}</li>`).join('');
+            document.getElementById('semanticResults').innerHTML = data.semantic_results.map(r => `<li>${r}</li>`).join('');
+            document.getElementById('graphResults').innerHTML = data.graph_results.map(r => `<li>${r}</li>`).join('');
+        }
+    </script>
+</body>
+</html>
