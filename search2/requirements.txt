@@ -4,3 +4,4 @@ rank-bm25==0.2.2
 faker==13.15.0 
 nltk==3.8.1 
 numpy==1.24.3
+huggingface_hub==0.10.1
