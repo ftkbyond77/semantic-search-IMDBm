@@ -1,14 +1,14 @@
-docker-compose exec web python manage.py makemigrations --dry-run
-    docker-compose exec web python manage.py makemigrations
-    docker-compose exec web python manage.py migrate
+docker-compose exec app python manage.py makemigrations --dry-run
+    docker-compose exec app python manage.py makemigrations
+    docker-compose exec app python manage.py migrate
 
-docker-compose exec web python manage.py import_imdb_data
+docker-compose exec app python manage.py import_imdb_data
 
-docker-compose exec web python manage.py seed_data
+docker-compose exec app python manage.py seed_data
 
-docker-compose exec web python manage.py precompute_indices
+docker-compose exec app python manage.py precompute_indices
 
-docker-compose exec web python manage.py import_graph
+docker-compose exec app python manage.py import_graph
 
 
 docker-compose exec db psql -U user -d dbname -c "SELECT COUNT(*) FROM movies_movie;"docker-compose exec neo4j neo4j-admin check-consistency

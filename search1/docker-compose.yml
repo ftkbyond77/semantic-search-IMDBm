@@ -8,6 +8,7 @@ services:
       - "8888:8888"  # Jupyter Notebook
     volumes:
       - .:/app
+      - ./logs:/app/logs
     environment:
       - PYTHONUNBUFFERED=1
       - DJANGO_DEBUG=True

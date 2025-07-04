@@ -1,6 +1,8 @@
 #!/bin/bash
 set -e
 
+mkdir -p /app/logs
+
 echo "Waiting for Neo4j to be available..."
 while ! nc -z neo4j 7687; do
   sleep 1
