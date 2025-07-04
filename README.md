@@ -1,4 +1,4 @@
-# Django IMDB Search Project
+# Django IMDB Search Project (Code broken now!!)
 
 This project is a Django-based web application that allows users to search the IMDB Top 1000 Movies and TV Shows dataset using both **keyword** and **semantic** search. Semantic search leverages sentence embeddings to find movies based on thematic similarity (e.g., "prison escape"), while keyword search matches exact terms in titles, genres, directors, or stars. Cosine similarity scores are displayed for semantic search results, indicating how closely each movie matches the query.
 
